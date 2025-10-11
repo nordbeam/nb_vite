@@ -702,35 +702,35 @@ if Code.ensure_loaded?(Igniter) do
                 # First, try to replace the combined CSS and JS pattern (common in phx.new projects)
                 |> String.replace(
                   ~r/(\s*)<link[^>]+href={~p"\/assets\/app\.css"}[^>]*>\s*\n\s*<script[^>]+src={~p"\/assets\/app\.js"}[^>]*>\s*\n\s*<\/script>/,
-                  "\\1<%= Vite.vite_client() %>\n\n\\1<%= Vite.vite_assets(\"css/app.css\") %>\n\n\\1<%= Vite.vite_assets(\"js/app.#{app_ext}\") %>"
+                  "\\1<%= NbVite.vite_client() %>\n\n\\1<%= NbVite.vite_assets(\"css/app.css\") %>\n\n\\1<%= NbVite.vite_assets(\"js/app.#{app_ext}\") %>"
                 )
                 # Pattern 1: CSS link with ~p sigil (handles /assets/css/app.css path)
                 |> String.replace(
                   ~r/<link[^>]+href={~p"\/assets\/css\/app\.css"}[^>]*>/,
-                  "<%= Vite.vite_assets(\"css/app.css\") %>"
+                  "<%= NbVite.vite_assets(\"css/app.css\") %>"
                 )
                 # Pattern 2: JS script with ~p sigil (handles /assets/js/app.js path)
                 |> String.replace(
                   ~r/<script[^>]+src={~p"\/assets\/js\/app\.js"}[^>]*>\s*<\/script>/,
-                  "<%= Vite.vite_assets(\"js/app.#{app_ext}\") %>"
+                  "<%= NbVite.vite_assets(\"js/app.#{app_ext}\") %>"
                 )
                 # Pattern 3: Legacy patterns for older Phoenix apps
                 |> String.replace(
                   ~r/<link[^>]+href={~p"\/assets\/app\.css"}[^>]*>/,
-                  "<%= Vite.vite_assets(\"css/app.css\") %>"
+                  "<%= NbVite.vite_assets(\"css/app.css\") %>"
                 )
                 |> String.replace(
                   ~r/<script[^>]+src={~p"\/assets\/app\.js"}[^>]*>\s*<\/script>/,
-                  "<%= Vite.vite_assets(\"js/app.#{app_ext}\") %>"
+                  "<%= NbVite.vite_assets(\"js/app.#{app_ext}\") %>"
                 )
                 # Pattern 4: Routes.static_path pattern (older Phoenix)
                 |> String.replace(
                   ~r/<link[^>]+href={Routes\.static_path\(@conn,\s*"\/assets\/app\.css"\)}[^>]*>/,
-                  "<%= Vite.vite_assets(\"css/app.css\") %>"
+                  "<%= NbVite.vite_assets(\"css/app.css\") %>"
                 )
                 |> String.replace(
                   ~r/<script[^>]+src={Routes\.static_path\(@conn,\s*"\/assets\/app\.js"\)}[^>]*>\s*<\/script>/,
-                  "<%= Vite.vite_assets(\"js/app.#{app_ext}\") %>"
+                  "<%= NbVite.vite_assets(\"js/app.#{app_ext}\") %>"
                 )
 
               # Add vite_client if not already present and we made replacements
@@ -739,8 +739,8 @@ if Code.ensure_loaded?(Igniter) do
                 if not String.contains?(updated, "vite_client") and updated != content do
                   String.replace(
                     updated,
-                    ~r/(\s*)(<%= Vite\.vite_assets\("css\/app\.css"\) %>)/,
-                    "\\1<%= Vite.vite_client() %>\n\n\\1\\2",
+                    ~r/(\s*)(<%= NbVite\.vite_assets\("css\/app\.css"\) %>)/,
+                    "\\1<%= NbVite.vite_client() %>\n\n\\1\\2",
                     global: false
                   )
                 else
@@ -752,8 +752,8 @@ if Code.ensure_loaded?(Igniter) do
                 if react and not String.contains?(updated, "react_refresh") do
                   String.replace(
                     updated,
-                    "<%= Vite.vite_client() %>",
-                    "<%= Vite.vite_client() %>\n    <%= Vite.react_refresh() %>"
+                    "<%= NbVite.vite_client() %>",
+                    "<%= NbVite.vite_client() %>\n    <%= NbVite.react_refresh() %>"
                   )
                 else
                   updated
@@ -763,8 +763,8 @@ if Code.ensure_loaded?(Igniter) do
               if react and typescript and not String.contains?(updated, "app.tsx") do
                 String.replace(
                   updated,
-                  ~r/(\s*)(<%= Vite\.vite_assets\("js\/app\.ts"\) %>)/,
-                  "\\1\\2\n\\1<%= Vite.vite_assets(\"js/app.tsx\") %>"
+                  ~r/(\s*)(<%= NbVite\.vite_assets\("js\/app\.ts"\) %>)/,
+                  "\\1\\2\n\\1<%= NbVite.vite_assets(\"js/app.tsx\") %>"
                 )
               else
                 updated
