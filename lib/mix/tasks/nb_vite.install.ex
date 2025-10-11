@@ -977,7 +977,11 @@ if Code.ensure_loaded?(Igniter) do
            )}
         end)
         |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
-          {:ok, Sourceror.Zipper.replace(zipper, quote(do: ["nb_vite.deps", "nb_vite build"]))}
+          {:ok,
+           Sourceror.Zipper.replace(
+             zipper,
+             quote(do: ["compile", "nb_vite.deps", "nb_vite build"])
+           )}
         end)
         |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
           {:ok,

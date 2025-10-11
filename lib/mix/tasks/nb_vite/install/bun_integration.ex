@@ -169,7 +169,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["bun assets", "bun build"])
+         quote(do: ["compile", "bun assets", "bun build"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
