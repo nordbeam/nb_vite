@@ -5,9 +5,20 @@
   "type": "module",
   "main": "./priv/nb_vite/dist/index.js",
   "types": "./priv/nb_vite/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./priv/nb_vite/dist/index.js",
+      "types": "./priv/nb_vite/dist/index.d.ts"
+    }
+  },
   "files": [
     "priv/nb_vite/dist",
-    "priv/nb_vite/src"
+    "priv/nb_vite/src",
+    "priv/static/nb_vite",
+    "lib",
+    "mix.exs",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "prebuild": "rm -rf priv/nb_vite/dist",
