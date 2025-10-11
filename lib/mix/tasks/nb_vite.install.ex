@@ -246,8 +246,8 @@ if Code.ensure_loaded?(Igniter) do
           })
         ],
         server: {
-          host: "127.0.0.1", // Force IPv4 for Elixir compatibility
-          port: 5173,
+          host: process.env.VITE_HOST || "127.0.0.1", // Force IPv4 for Elixir compatibility
+          port: parseInt(process.env.VITE_PORT || "5173"),
         },#{build_resolve_config(options, is_phoenix_1_8, app_name)}
       })
       """
