@@ -514,7 +514,7 @@ if Code.ensure_loaded?(Igniter) do
 
       dev_deps =
         if features.ssr do
-          Map.put(dev_deps, "vite-node", "^2.1.8")
+          Map.put(dev_deps, "vite-node", "^3.0.0")
         else
           dev_deps
         end
