@@ -141,7 +141,14 @@ defmodule NbVite do
 
     case Map.get(manifest, entry) do
       nil ->
-        raise "Asset '#{entry}' not found in Vite manifest"
+        # For CSS files with Tailwind CSS 4.x, the @tailwindcss/vite plugin
+        # handles CSS injection automatically without a manifest entry.
+        # Return empty string instead of crashing.
+        if String.ends_with?(entry, ".css") do
+          Phoenix.HTML.raw("")
+        else
+          raise "Asset '#{entry}' not found in Vite manifest"
+        end
 
       %{"file" => file} = entry_data ->
         # Add CSS imports

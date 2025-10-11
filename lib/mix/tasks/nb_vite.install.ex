@@ -16,31 +16,15 @@ if Code.ensure_loaded?(Igniter) do
 
     ## Options
 
-        --ssr                Enable Server-Side Rendering support
         --tls                Enable automatic TLS certificate detection
-        --react              Enable React Fast Refresh support
         --typescript         Enable TypeScript support
-        --bun                Use Bun as the package manager instead of npm
         --yes                Don't prompt for confirmations
-
-    ## Package Manager Support
-
-    NbVite supports two approaches for package management:
-
-    1. **System Package Managers** (npm, pnpm, yarn): Uses whatever is installed on the system
-    2. **Elixir-Managed Bun** (--bun flag): Uses the Elixir bun package to download and manage the bun executable
-
-    The --bun option is special because:
-    - It adds a Mix dependency for bun
-    - The bun executable is managed at _build/bun
-    - It can use Bun workspaces for Phoenix JS dependencies
-    - Mix tasks handle the bun installation lifecycle
 
     ## Inertia.js Support
 
-    For Inertia.js integration, install nb_inertia separately after nb_vite:
+    For Inertia.js integration with React and SSR, install nb_inertia separately after nb_vite:
 
-        $ mix nb_vite.install --react --typescript
+        $ mix nb_vite.install --typescript
         $ mix nb_inertia.install
 
     See https://github.com/nordbeam/nb_inertia for more information.
@@ -55,12 +39,9 @@ if Code.ensure_loaded?(Igniter) do
     def info(_argv, _parent) do
       %Igniter.Mix.Task.Info{
         schema: [
-          ssr: :boolean,
-          tls: :boolean,
-          react: :boolean,
           typescript: :boolean,
-          yes: :boolean,
-          bun: :boolean
+          tls: :boolean,
+          yes: :boolean
         ],
         defaults: [],
         positional: [],
@@ -188,9 +169,50 @@ if Code.ensure_loaded?(Igniter) do
       is_phoenix_1_8 = igniter.assigns[:is_phoenix_1_8] || false
       app_name = Igniter.Project.Application.app_name(igniter) |> to_string()
 
-      config = build_vite_config(igniter.args.options, has_tailwind, is_phoenix_1_8, app_name)
+      # Copy the phoenix plugin to assets/vite-plugins/ for production builds
+      igniter = copy_phoenix_plugin(igniter)
+
+      # Only pass typescript option for standard vite config - react and ssr are handled by nb_inertia
+      simplified_options = %{typescript: igniter.args.options[:typescript]}
+      config = build_vite_config(simplified_options, has_tailwind, is_phoenix_1_8, app_name)
 
       Igniter.create_new_file(igniter, "assets/vite.config.js", config, on_exists: :skip)
+    end
+
+    defp copy_phoenix_plugin(igniter) do
+      # Read the phoenix plugin from nb_vite priv directory
+      priv_dir = :code.priv_dir(:nb_vite)
+      plugin_source = Path.join([priv_dir, "static", "nb_vite", "index.js"])
+      html_source = Path.join([priv_dir, "static", "nb_vite", "dev-server-index.html"])
+
+      # Copy phoenix plugin to assets/vite-plugins/phoenix.js
+      igniter =
+        case File.read(plugin_source) do
+          {:ok, content} ->
+            Igniter.create_new_file(igniter, "assets/vite-plugins/phoenix.js", content,
+              on_exists: :overwrite
+            )
+
+          {:error, _} ->
+            Igniter.add_warning(
+              igniter,
+              "Could not find phoenix plugin at #{plugin_source}. The plugin may need to be copied manually."
+            )
+        end
+
+      # Copy dev-server-index.html to assets/vite-plugins/
+      case File.read(html_source) do
+        {:ok, content} ->
+          Igniter.create_new_file(igniter, "assets/vite-plugins/dev-server-index.html", content,
+            on_exists: :overwrite
+          )
+
+        {:error, _} ->
+          Igniter.add_warning(
+            igniter,
+            "Could not find dev-server-index.html at #{html_source}. The file may need to be copied manually."
+          )
+      end
     end
 
     defp build_vite_config(options, has_tailwind, is_phoenix_1_8, app_name) do
@@ -212,7 +234,7 @@ if Code.ensure_loaded?(Igniter) do
 
       """
       import { defineConfig } from 'vite'
-      import phoenix from '../deps/nb_vite/priv/static/nb_vite/index.js'#{path_import}#{imports}
+      import phoenix from './vite-plugins/phoenix.js'#{path_import}#{imports}
 
       export default defineConfig({
         plugins: [#{plugins}
@@ -240,7 +262,7 @@ if Code.ensure_loaded?(Igniter) do
 
       """
       import { defineConfig } from 'vite'
-      import phoenix from '../deps/nb_vite/priv/static/nb_vite/index.js'#{path_import}#{imports}
+      import phoenix from './vite-plugins/phoenix.js'#{path_import}#{imports}
       import nodePrefixPlugin from './vite-plugins/node-prefix-plugin.js'
 
       export default defineConfig(({ command, mode, isSsrBuild }) => {
@@ -348,9 +370,8 @@ if Code.ensure_loaded?(Igniter) do
 
     defp build_input_files(options) do
       typescript = options[:typescript] || false
-      react = options[:react] || false
 
-      entry_extension = determine_entry_extension(typescript, react)
+      entry_extension = if typescript, do: "ts", else: "js"
       "['js/app.#{entry_extension}', 'css/app.css']"
     end
 
@@ -436,9 +457,9 @@ if Code.ensure_loaded?(Igniter) do
       {igniter, has_daisyui} = detect_daisyui(igniter)
 
       features = %{
-        react: igniter.args.options[:react] || false,
+        react: false,
         typescript: igniter.args.options[:typescript] || false,
-        ssr: igniter.args.options[:ssr] || false,
+        ssr: false,
         tailwind: has_tailwind,
         topbar: has_topbar,
         daisyui: has_daisyui
@@ -679,13 +700,12 @@ if Code.ensure_loaded?(Igniter) do
           "root.html.heex"
         ])
 
-      react = igniter.args.options[:react] || false
       typescript = igniter.args.options[:typescript] || false
 
-      # Determine the correct app file extension
-      app_ext = determine_app_extension(typescript, react)
+      # Determine the correct app file extension (only js or ts, no jsx/tsx)
+      app_ext = if typescript, do: "ts", else: "js"
 
-      # First update the regular root.html.heex regardless of inertia flag
+      # Update the regular root.html.heex with simplified Vite helpers
       igniter
       |> Igniter.include_existing_file(file_path)
       |> Igniter.update_file(file_path, fn source ->
@@ -735,36 +755,12 @@ if Code.ensure_loaded?(Igniter) do
 
               # Add vite_client if not already present and we made replacements
               # Only needed if the combined pattern didn't match
-              updated =
-                if not String.contains?(updated, "vite_client") and updated != content do
-                  String.replace(
-                    updated,
-                    ~r/(\s*)(<%= NbVite\.vite_assets\("css\/app\.css"\) %>)/,
-                    "\\1<%= NbVite.vite_client() %>\n\n\\1\\2",
-                    global: false
-                  )
-                else
-                  updated
-                end
-
-              # Add react_refresh after vite_client if React is enabled
-              updated =
-                if react and not String.contains?(updated, "react_refresh") do
-                  String.replace(
-                    updated,
-                    "<%= NbVite.vite_client() %>",
-                    "<%= NbVite.vite_client() %>\n    <%= NbVite.react_refresh() %>"
-                  )
-                else
-                  updated
-                end
-
-              # Add app.tsx reference if React and TypeScript are both enabled
-              if react and typescript and not String.contains?(updated, "app.tsx") do
+              if not String.contains?(updated, "vite_client") and updated != content do
                 String.replace(
                   updated,
-                  ~r/(\s*)(<%= NbVite\.vite_assets\("js\/app\.ts"\) %>)/,
-                  "\\1\\2\n\\1<%= NbVite.vite_assets(\"js/app.tsx\") %>"
+                  ~r/(\s*)(<%= NbVite\.vite_assets\("css\/app\.css"\) %>)/,
+                  "\\1<%= NbVite.vite_client() %>\n\n\\1\\2",
+                  global: false
                 )
               else
                 updated
@@ -820,44 +816,21 @@ if Code.ensure_loaded?(Igniter) do
 
     def setup_assets(igniter) do
       typescript = igniter.args.options[:typescript] || false
-      react = igniter.args.options[:react] || false
-
-      file_extension = if typescript, do: "ts", else: "js"
 
       igniter
-      |> create_app_js(file_extension, react, typescript)
+      |> create_app_js(typescript)
       |> create_app_css()
-      |> maybe_create_typescript_config(typescript, react)
+      |> maybe_create_typescript_config(typescript)
     end
 
-    defp create_app_js(igniter, extension, react, typescript) do
-      cond do
-        react ->
-          # For React, create a JSX/TSX file
-          entry_extension = if typescript, do: "tsx", else: "jsx"
-          content = react_app_content(extension)
-
-          igniter =
-            igniter
-            |> Igniter.create_new_file("assets/js/app.#{entry_extension}", content,
-              on_exists: :overwrite
-            )
-
-          # Also handle app.js conversion to app.ts if TypeScript is enabled
-          if typescript && Igniter.exists?(igniter, "assets/js/app.js") do
-            Igniter.move_file(igniter, "assets/js/app.js", "assets/js/app.ts", on_exists: :skip)
-          else
-            igniter
-          end
-
-        true ->
-          # For non-React projects, handle TypeScript conversion if needed
-          if typescript && Igniter.exists?(igniter, "assets/js/app.js") do
-            # Rename app.js to app.ts when TypeScript is enabled
-            Igniter.move_file(igniter, "assets/js/app.js", "assets/js/app.ts", on_exists: :skip)
-          else
-            igniter
-          end
+    defp create_app_js(igniter, typescript) do
+      # For standard nb_vite, only handle TypeScript conversion if needed
+      # React files will be created by nb_inertia
+      if typescript && Igniter.exists?(igniter, "assets/js/app.js") do
+        # Rename app.js to app.ts when TypeScript is enabled
+        Igniter.move_file(igniter, "assets/js/app.js", "assets/js/app.ts", on_exists: :skip)
+      else
+        igniter
       end
     end
 
@@ -908,15 +881,12 @@ if Code.ensure_loaded?(Igniter) do
       """
     end
 
-    defp maybe_create_typescript_config(igniter, false, _), do: igniter
+    defp maybe_create_typescript_config(igniter, false), do: igniter
 
-    defp maybe_create_typescript_config(igniter, true, react) do
-      config =
-        if react do
-          react_tsconfig_json()
-        else
-          basic_tsconfig_json()
-        end
+    defp maybe_create_typescript_config(igniter, true) do
+      # For standard nb_vite, use basic TypeScript config
+      # React-specific tsconfig will be handled by nb_inertia
+      config = basic_tsconfig_json()
 
       Igniter.create_new_file(igniter, "assets/tsconfig.json", config, on_exists: :skip)
     end
@@ -1204,29 +1174,12 @@ if Code.ensure_loaded?(Igniter) do
 
       notices = [base_notice]
       # Bun notice is now handled by BunIntegration
-      notices = maybe_add_react_notice(notices, options)
       notices = maybe_add_typescript_notice(notices, options)
-      notices = maybe_add_ssr_notice(notices, options)
       notices = maybe_add_inertia_notice(notices, options)
       notices = maybe_add_shadcn_notice(notices, options)
 
       notices ++ [build_documentation_notice()]
     end
-
-    defp maybe_add_react_notice(notices, %{react: true} = options) do
-      typescript = options[:typescript] || false
-
-      notice = """
-      React Configuration:
-      - React Fast Refresh is enabled for instant component updates
-      - Add a <div id="react-root"></div> to mount React components
-      - Import your React components in app.#{if typescript, do: "tsx", else: "jsx"}
-      """
-
-      notices ++ [notice]
-    end
-
-    defp maybe_add_react_notice(notices, _), do: notices
 
     defp maybe_add_typescript_notice(notices, %{typescript: true}) do
       notice = """
@@ -1240,18 +1193,6 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp maybe_add_typescript_notice(notices, _), do: notices
-
-    defp maybe_add_ssr_notice(notices, %{ssr: true}) do
-      notice = """
-      SSR Configuration:
-      - Create a js/ssr.js file for your server-side rendering logic
-      - Use `mix nb_vite.ssr.build` to build your SSR bundle
-      """
-
-      notices ++ [notice]
-    end
-
-    defp maybe_add_ssr_notice(notices, _), do: notices
 
     defp maybe_add_inertia_notice(notices, options) when is_list(options) do
       if Keyword.get(options, :inertia, false) do

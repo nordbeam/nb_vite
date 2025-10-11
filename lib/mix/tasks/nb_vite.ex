@@ -20,7 +20,7 @@ defmodule Mix.Tasks.NbVite do
   @impl true
   def run(args) do
     npm_path =
-      find_executable("npm") || find_executable("bun") || find_executable("pnpm") ||
+      find_executable("bun") || find_executable("npm") || find_executable("pnpm") ||
         find_executable("yarn")
 
     unless npm_path do
@@ -122,7 +122,7 @@ defmodule Mix.Tasks.NbVite.Deps do
   @impl true
   def run(_args) do
     npm_path =
-      find_executable("npm") || find_executable("bun") || find_executable("pnpm") ||
+      find_executable("bun") || find_executable("npm") || find_executable("pnpm") ||
         find_executable("yarn")
 
     unless npm_path do

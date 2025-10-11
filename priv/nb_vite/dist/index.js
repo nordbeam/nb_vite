@@ -2622,6 +2622,7 @@ function resolvePhoenixPlugin(pluginConfig) {
                     ssrManifest: userConfig.build?.ssrManifest ??
                         (ssr ? "ssr-manifest.json" : false),
                     outDir: userConfig.build?.outDir ?? resolveOutDir(pluginConfig, ssr),
+                    assetsDir: userConfig.build?.assetsDir ?? (ssr ? "" : "."),
                     emptyOutDir: false,
                     rollupOptions: {
                         input: userConfig.build?.rollupOptions?.input ??

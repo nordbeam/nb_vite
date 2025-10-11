@@ -256,9 +256,9 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       # Bun package handles its own installation via mix task
       nil
     else
-      # Detect system package manager
+      # Detect system package manager - prefer Bun over npm
       npm_path =
-        System.find_executable("npm") || System.find_executable("bun") ||
+        System.find_executable("bun") || System.find_executable("npm") ||
           System.find_executable("pnpm") || System.find_executable("yarn") ||
           raise "No package manager found. Please install npm, bun, pnpm, or yarn."
 
