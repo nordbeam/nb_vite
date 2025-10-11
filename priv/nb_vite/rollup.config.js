@@ -9,7 +9,20 @@ export default {
     format: "esm",
     inlineDynamicImports: true,
   },
-  external: ["vite", "node:fs", "node:path", "node:net", "fs", "path", "net"],
+  external: [
+    "vite",
+    "vite-node/server",
+    "vite-node/client",
+    "vite-node/source-map",
+    "node:fs",
+    "node:path",
+    "node:net",
+    "node:http",
+    "fs",
+    "path",
+    "net",
+    "http"
+  ],
   plugins: [
     resolve({
       preferBuiltins: true,

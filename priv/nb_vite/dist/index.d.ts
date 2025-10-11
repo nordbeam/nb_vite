@@ -1,5 +1,32 @@
 import { PluginOption, Rollup } from "vite";
 import { Config as FullReloadConfig } from "vite-plugin-full-reload";
+interface SSRConfig {
+    /**
+     * Enable SSR dev server endpoint
+     * @default false
+     */
+    enabled?: boolean;
+    /**
+     * The path where the SSR endpoint will be available
+     * @default '/ssr'
+     */
+    path?: string;
+    /**
+     * The path for the health check endpoint
+     * @default '/ssr-health'
+     */
+    healthPath?: string;
+    /**
+     * The entry point for SSR rendering in development
+     * @default './js/ssr_dev.tsx'
+     */
+    entryPoint?: string;
+    /**
+     * The path to the SSR "hot" file
+     * @default 'priv/ssr-hot'
+     */
+    hotFile?: string;
+}
 interface PluginConfig {
     /**
      * The path or paths of the entry points to compile.
@@ -30,7 +57,7 @@ interface PluginConfig {
      */
     manifestPath?: string;
     /**
-     * The path of the SSR entry point.
+     * The path of the SSR entry point for production builds.
      */
     ssr?: string | string[] | Rollup.InputOption;
     /**
@@ -39,6 +66,13 @@ interface PluginConfig {
      * @default 'priv/ssr'
      */
     ssrOutputDirectory?: string;
+    /**
+     * SSR development server configuration.
+     * Set to true to enable with defaults, or provide configuration object.
+     *
+     * @default false
+     */
+    ssrDev?: boolean | SSRConfig;
     /**
      * Enable React Refresh (for React projects).
      *
