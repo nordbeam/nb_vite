@@ -277,7 +277,23 @@ if Code.ensure_loaded?(Igniter) do
       # which can cause false warnings during config initialization.
 
       config_items = maybe_add_config(config_items, "detectTls: true", !!options[:tls])
-      config_items = maybe_add_config(config_items, "ssr: 'js/ssr.js'", !!options[:ssr])
+
+      config_items =
+        if options[:ssr] do
+          ssr_config = """
+          ssrDev: {
+                    enabled: true,
+                    path: '/ssr',
+                    healthPath: '/ssr-health',
+                    entryPoint: './js/ssr_dev.tsx',
+                    hotFile: '../priv/ssr-hot',
+                  }
+          """
+
+          [ssr_config | config_items]
+        else
+          config_items
+        end
 
       case config_items do
         [] -> ""

@@ -95,7 +95,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       "config.exs",
       :bun,
       [:version],
-      "1.1.22"
+      "1.3.0"
     )
     |> Igniter.Project.Config.configure(
       "config.exs",
