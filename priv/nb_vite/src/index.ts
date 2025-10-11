@@ -695,7 +695,7 @@ function resolvePhoenixPlugin(
         },
         server: {
           origin:
-            userConfig?.server?.origin ?? "http://__vitex_placeholder__.test",
+            userConfig?.server?.origin ?? "http://__nb_vite_placeholder__.test",
           cors: userConfig?.server?.cors ?? {
             origin: userConfig?.server?.origin ?? [
               // Default patterns for localhost (IPv4, IPv6)
@@ -760,7 +760,7 @@ function resolvePhoenixPlugin(
     transform(code) {
       if (resolvedConfig.command === "serve") {
         code = code.replace(
-          /http:\/\/__vitex_placeholder__\.test/g,
+          /http:\/\/__nb_vite_placeholder__\.test/g,
           viteDevServerUrl,
         );
 
@@ -777,9 +777,10 @@ function resolvePhoenixPlugin(
         loadEnv(server.config.mode, envDir, "PHX_HOST").PHX_HOST ?? "localhost:4000";
 
       // Setup SSR if enabled
-      const ssrSetup = pluginConfig.ssrDev?.enabled
-        ? await setupSSREndpoint(server, pluginConfig.ssrDev)
-        : null;
+      const ssrSetup =
+        typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.enabled
+          ? await setupSSREndpoint(server, pluginConfig.ssrDev as Required<SSRConfig>)
+          : null;
 
       server.httpServer?.once("listening", () => {
         const address = server.httpServer?.address();
@@ -810,7 +811,7 @@ function resolvePhoenixPlugin(
             }
 
             // Write SSR hot file if SSR is enabled
-            if (pluginConfig.ssrDev?.enabled && pluginConfig.ssrDev.hotFile) {
+            if (typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.enabled && pluginConfig.ssrDev.hotFile) {
               try {
                 const ssrUrl = `${viteDevServerUrl}${server.config.base.replace(/\/$/, "")}${pluginConfig.ssrDev.path}`;
                 const ssrHotDir = path.dirname(pluginConfig.ssrDev.hotFile);
@@ -829,7 +830,7 @@ function resolvePhoenixPlugin(
               } catch (error) {
                 console.error(
                   `\n[vite] ${colors.red("Error")}: Failed to write SSR hot file.\n` +
-                    `Path: ${pluginConfig.ssrDev.hotFile}\n` +
+                    `Path: ${typeof pluginConfig.ssrDev === 'object' ? pluginConfig.ssrDev.hotFile : 'unknown'}\n` +
                     `Error: ${error instanceof Error ? error.message : String(error)}\n`,
                 );
               }
@@ -934,7 +935,7 @@ function resolvePhoenixPlugin(
           }
 
           // Clean up SSR hot file if it exists
-          if (pluginConfig.ssrDev?.hotFile && fs.existsSync(pluginConfig.ssrDev.hotFile)) {
+          if (typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.hotFile && fs.existsSync(pluginConfig.ssrDev.hotFile)) {
             try {
               fs.rmSync(pluginConfig.ssrDev.hotFile);
               if (process.env.DEBUG || process.env.VERBOSE) {
@@ -994,34 +995,56 @@ function resolvePhoenixPlugin(
           next();
         });
     },
-    generateBundle(_options, bundle) {
+    writeBundle() {
       // Only generate manifest for non-SSR builds
+      // Use writeBundle instead of generateBundle so we can read Vite's generated manifest
       if (!resolvedConfig.build.ssr) {
         try {
-          const manifestChunks = Object.values(bundle)
-            .filter(
-              (chunk): chunk is OutputChunk =>
-                chunk.type === "chunk" && chunk.isEntry,
-            )
-            .map(
-              (chunk): ManifestChunk => ({
-                file: chunk.fileName,
-                name: chunk.name || "",
-                src: chunk.facadeModuleId || undefined,
-                isEntry: true,
-                imports: chunk.imports,
-                css: Array.from(chunk.viteMetadata?.importedCss || []),
-                assets: Array.from(chunk.viteMetadata?.importedAssets || []),
-              }),
-            );
+          // Read Vite's generated manifest
+          const viteManifestPath = path.join(
+            resolvedConfig.build.outDir,
+            ".vite",
+            "manifest.json"
+          );
 
-          const manifest = manifestChunks.reduce((manifest, chunk) => {
-            if (chunk.src) {
-              const assetPath = toPhoenixAssetPath(chunk.src);
-              manifest[assetPath] = chunk;
+          if (!fs.existsSync(viteManifestPath)) {
+            console.warn(
+              `\n[vite] ${colors.yellow("Warning")}: Vite manifest not found at ${viteManifestPath}\n`
+            );
+            return;
+          }
+
+          const viteManifest = JSON.parse(
+            fs.readFileSync(viteManifestPath, "utf-8")
+          ) as Manifest;
+
+          // Transform Vite's manifest to add the buildDirectory prefix to file paths
+          const manifest = {} as Manifest;
+
+          for (const [key, entry] of Object.entries(viteManifest)) {
+            const transformedEntry = { ...entry };
+
+            // Add buildDirectory prefix to file path
+            if (entry.file) {
+              transformedEntry.file = `${pluginConfig.buildDirectory}/${entry.file}`;
             }
-            return manifest;
-          }, {} as Manifest);
+
+            // Transform CSS array
+            if (entry.css && Array.isArray(entry.css)) {
+              transformedEntry.css = entry.css.map(
+                (css) => `${pluginConfig.buildDirectory}/${css}`
+              );
+            }
+
+            // Transform assets array
+            if (entry.assets && Array.isArray(entry.assets)) {
+              transformedEntry.assets = entry.assets.map(
+                (asset) => `${pluginConfig.buildDirectory}/${asset}`
+              );
+            }
+
+            manifest[key] = transformedEntry;
+          }
 
           const manifestContent = JSON.stringify(manifest, null, 2);
           const manifestDir = path.dirname(pluginConfig.manifestPath);

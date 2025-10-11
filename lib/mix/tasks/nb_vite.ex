@@ -45,7 +45,10 @@ defmodule Mix.Tasks.NbVite do
     env = [
       {"NODE_ENV", node_env()},
       {"MIX_ENV", to_string(Mix.env())},
-      {"PHOENIX_BUILD_PATH", Mix.Project.build_path()}
+      {"PHOENIX_BUILD_PATH", Mix.Project.build_path()},
+      {"PHX_BUILD_PATH", Mix.Project.build_path()},
+      {"PHX_APP_NAME", to_string(Mix.Project.config()[:app])},
+      {"PHX_VERSION", phoenix_version()}
     ]
 
     # Pass through Phoenix-specific env vars if they exist
@@ -81,6 +84,23 @@ defmodule Mix.Tasks.NbVite do
     case System.get_env(key) do
       nil -> env
       value -> env ++ [{key, value}]
+    end
+  end
+
+  defp phoenix_version do
+    # Check if phoenix_live_view dependency exists and get version
+    case List.keyfind(Mix.Project.config()[:deps] || [], :phoenix_live_view, 0) do
+      {:phoenix_live_view, version_req} when is_binary(version_req) ->
+        # Extract major.minor from version requirement
+        case Regex.run(~r/(\d+)\.(\d+)/, version_req) do
+          # Assume .8+ for Phoenix 1.8+
+          [_, major, _minor] -> "#{major}.8"
+          _ -> "unknown"
+        end
+
+      # Default to 1.8 if colocated JS is being used
+      _ ->
+        "1.8"
     end
   end
 end
