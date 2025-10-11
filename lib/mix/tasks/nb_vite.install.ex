@@ -244,7 +244,11 @@ if Code.ensure_loaded?(Igniter) do
             hotFile: '../priv/hot',
             manifestPath: '../priv/static/assets/manifest.json',#{additional_opts}
           })
-        ],#{build_resolve_config(options, is_phoenix_1_8, app_name)}
+        ],
+        server: {
+          host: "127.0.0.1", // Force IPv4 for Elixir compatibility
+          port: 5173,
+        },#{build_resolve_config(options, is_phoenix_1_8, app_name)}
       })
       """
     end
