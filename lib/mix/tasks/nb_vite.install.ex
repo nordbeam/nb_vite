@@ -498,7 +498,10 @@ if Code.ensure_loaded?(Igniter) do
     defp build_dependencies(features) do
       deps = %{
         "vite" => "^7.0.0",
-        "nb_vite" => "workspace:*"
+        "nb_vite" => "workspace:*",
+        "phoenix" => "workspace:*",
+        "phoenix_html" => "workspace:*",
+        "phoenix_live_view" => "workspace:*"
       }
 
       deps = if features.topbar, do: Map.put(deps, "topbar", "^3.0.0"), else: deps
