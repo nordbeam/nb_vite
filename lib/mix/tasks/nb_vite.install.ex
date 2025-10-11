@@ -194,6 +194,14 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp build_vite_config(options, has_tailwind, is_phoenix_1_8, app_name) do
+      if options[:ssr] do
+        build_ssr_vite_config(options, has_tailwind, is_phoenix_1_8, app_name)
+      else
+        build_standard_vite_config(options, has_tailwind, is_phoenix_1_8, app_name)
+      end
+    end
+
+    defp build_standard_vite_config(options, has_tailwind, is_phoenix_1_8, app_name) do
       imports = build_vite_imports(options, has_tailwind)
       plugins = build_vite_plugins(options, has_tailwind)
       input_files = build_input_files(options)
@@ -217,6 +225,99 @@ if Code.ensure_loaded?(Igniter) do
           })
         ],#{build_resolve_config(options, is_phoenix_1_8, app_name)}
       })
+      """
+    end
+
+    defp build_ssr_vite_config(options, has_tailwind, is_phoenix_1_8, app_name) do
+      imports = build_vite_imports(options, has_tailwind)
+      plugins = build_vite_plugins(options, has_tailwind)
+      input_files = build_input_files(options)
+      additional_opts = build_additional_options(options)
+      extension = if options[:typescript], do: "tsx", else: "jsx"
+
+      path_import =
+        if options[:shadcn] || is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
+
+      """
+      import { defineConfig } from 'vite'
+      import phoenix from '../deps/nb_vite/priv/static/nb_vite/index.js'#{path_import}#{imports}
+      import nodePrefixPlugin from './vite-plugins/node-prefix-plugin.js'
+
+      export default defineConfig(({ command, mode, isSsrBuild }) => {
+        const isSSR = isSsrBuild || process.env.BUILD_SSR === "true";
+
+        if (isSSR) {
+          // SSR build configuration for Deno compatibility
+          return {
+            plugins: [#{build_ssr_plugins(options)}nodePrefixPlugin()],
+            build: {
+              ssr: true,
+              outDir: "../priv/static",
+              rollupOptions: {
+                input: "js/ssr_prod.#{extension}",
+                output: {
+                  format: "esm",
+                  entryFileNames: "ssr.js",
+                  footer: "globalThis.render = render;",
+                },
+              },
+            },
+            resolve: {
+              alias: {
+                "@": path.resolve(__dirname, "./js"),
+              },
+            },
+            ssr: {
+              noExternal: true,
+              target: "neutral",
+            },
+          };
+        }
+
+        // Client build configuration
+        return {
+          plugins: [#{plugins}
+            phoenix({
+              input: #{input_files},
+              publicDirectory: '../priv/static',
+              buildDirectory: 'assets',
+              hotFile: '../priv/hot',
+              manifestPath: '../priv/static/assets/manifest.json',#{additional_opts}
+            })
+          ],#{build_ssr_server_config()}#{build_resolve_config(options, is_phoenix_1_8, app_name)}
+        };
+      })
+      """
+    end
+
+    defp build_ssr_plugins(options) do
+      plugins = []
+
+      plugins =
+        if options[:react],
+          do: plugins ++ ["react(), "],
+          else: plugins
+
+      plugins =
+        if options[:vue],
+          do: plugins ++ ["vue(), "],
+          else: plugins
+
+      plugins =
+        if options[:svelte],
+          do: plugins ++ ["svelte(), "],
+          else: plugins
+
+      Enum.join(plugins, "")
+    end
+
+    defp build_ssr_server_config() do
+      """
+
+          server: {
+            host: process.env.VITE_HOST || "127.0.0.1", // Listen on IPv4 for compatibility with Erlang :httpc
+            port: parseInt(process.env.VITE_PORT || "5173"),
+          },
       """
     end
 
