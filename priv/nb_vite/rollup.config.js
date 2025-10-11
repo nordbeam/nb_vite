@@ -11,6 +11,9 @@ export default {
   },
   external: [
     "vite",
+    "vite-node/server",
+    "vite-node/client",
+    "vite-node/source-map",
     "node:fs",
     "node:path",
     "node:net",
