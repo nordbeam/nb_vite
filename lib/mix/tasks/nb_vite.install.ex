@@ -438,6 +438,7 @@ if Code.ensure_loaded?(Igniter) do
       features = %{
         react: igniter.args.options[:react] || false,
         typescript: igniter.args.options[:typescript] || false,
+        ssr: igniter.args.options[:ssr] || false,
         tailwind: has_tailwind,
         topbar: has_topbar,
         daisyui: has_daisyui
@@ -507,6 +508,13 @@ if Code.ensure_loaded?(Igniter) do
       dev_deps =
         if features.typescript do
           Map.put(dev_deps, "typescript", "^5.7.2")
+        else
+          dev_deps
+        end
+
+      dev_deps =
+        if features.ssr do
+          Map.put(dev_deps, "vite-node", "^2.1.8")
         else
           dev_deps
         end
