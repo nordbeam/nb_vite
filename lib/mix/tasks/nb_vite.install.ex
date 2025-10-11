@@ -169,8 +169,7 @@ if Code.ensure_loaded?(Igniter) do
       is_phoenix_1_8 = igniter.assigns[:is_phoenix_1_8] || false
       app_name = Igniter.Project.Application.app_name(igniter) |> to_string()
 
-      # Copy the phoenix plugin to assets/vite-plugins/ for production builds
-      igniter = copy_phoenix_plugin(igniter)
+      # No longer need to copy the phoenix plugin - it's available via npm workspace
 
       # Only pass typescript option for standard vite config - react and ssr are handled by nb_inertia
       simplified_options = %{typescript: igniter.args.options[:typescript]}
@@ -234,7 +233,7 @@ if Code.ensure_loaded?(Igniter) do
 
       """
       import { defineConfig } from 'vite'
-      import phoenix from './vite-plugins/phoenix.js'#{path_import}#{imports}
+      import { phoenix } from 'nb_vite'#{path_import}#{imports}
 
       export default defineConfig({
         plugins: [#{plugins}
@@ -262,7 +261,7 @@ if Code.ensure_loaded?(Igniter) do
 
       """
       import { defineConfig } from 'vite'
-      import phoenix from './vite-plugins/phoenix.js'#{path_import}#{imports}
+      import { phoenix } from 'nb_vite'#{path_import}#{imports}
       import nodePrefixPlugin from './vite-plugins/node-prefix-plugin.js'
 
       export default defineConfig(({ command, mode, isSsrBuild }) => {
@@ -479,6 +478,7 @@ if Code.ensure_loaded?(Igniter) do
         "version" => "0.0.0",
         "type" => "module",
         "private" => true,
+        "workspaces" => ["../deps/*"],
         "dependencies" => dependencies,
         "devDependencies" => dev_dependencies,
         "scripts" => %{
@@ -496,7 +496,10 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp build_dependencies(features) do
-      deps = %{"vite" => "^7.0.0"}
+      deps = %{
+        "vite" => "^7.0.0",
+        "nb_vite" => "workspace:*"
+      }
 
       deps = if features.topbar, do: Map.put(deps, "topbar", "^3.0.0"), else: deps
 

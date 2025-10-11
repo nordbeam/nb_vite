@@ -23,7 +23,8 @@ vitex-*.tar
 /tmp/
 
 # Ignore node_modules but not dist (we commit the built file)
-/priv/vitex/node_modules/
+/node_modules/
+/priv/nb_vite/node_modules/
 
 # macOS
 .DS_Store
