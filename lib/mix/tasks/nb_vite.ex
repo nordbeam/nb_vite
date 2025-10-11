@@ -34,10 +34,9 @@ defmodule Mix.Tasks.NbVite do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    # Run vite command with --cwd for bun, or cd for others
     cmd_args =
       if npm_path =~ "bun" do
-        ["--cwd", assets_dir, "x", "--bun", "vite"] ++ args
+        ["x", "--bun", "vite"] ++ args
       else
         ["run", "vite"] ++ args
       end
@@ -67,15 +66,7 @@ defmodule Mix.Tasks.NbVite do
       |> maybe_add_env("RENDER")
       |> maybe_add_env("RAILWAY_ENVIRONMENT")
 
-    # For bun, we use --cwd so no need to cd. For others, cd to assets dir.
-    cmd =
-      if npm_path =~ "bun" do
-        "#{npm_path} #{Enum.join(cmd_args, " ")}"
-      else
-        "cd #{assets_dir} && #{npm_path} #{Enum.join(cmd_args, " ")}"
-      end
-
-    Mix.shell().cmd(cmd, env: env)
+    Mix.shell().cmd("cd #{assets_dir} && #{npm_path} #{Enum.join(cmd_args, " ")}", env: env)
   end
 
   defp find_executable(name) do
