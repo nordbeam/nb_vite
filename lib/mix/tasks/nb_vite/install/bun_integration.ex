@@ -62,7 +62,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
   def config do
     %{
       executable: "_build/bun",
-      install_cmd: "bun install --cwd assets",
+      install_cmd: "mix bun assets install",
       run_cmd: "_build/bun run",
       uses_workspaces: true,
       requires_dep: {:bun, "~> 1.5", runtime: Mix.env() == :dev}
@@ -86,23 +86,6 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       :bun,
       [:version],
       "1.3.0"
-    )
-    |> Igniter.Project.Config.configure(
-      "config.exs",
-      :bun,
-      [:assets],
-      {:code,
-       quote do
-         [
-           args: ["install"],
-           cd: Path.expand("../assets", __DIR__),
-           env: %{
-             "PHX_BUILD_PATH" => Mix.Project.build_path(),
-             "PHX_APP_NAME" => unquote(app_name),
-             "PHX_VERSION" => unquote(phoenix_version)
-           }
-         ]
-       end}
     )
     |> Igniter.Project.Config.configure(
       "config.exs",
@@ -138,6 +121,18 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
          ]
        end}
     )
+    |> Igniter.Project.Config.configure(
+      "config.exs",
+      :bun,
+      [:assets],
+      {:code,
+       quote do
+         [
+           args: [],
+           cd: Path.expand("../assets", __DIR__)
+         ]
+       end}
+    )
   end
 
   defp setup_mix_aliases(igniter) do
@@ -146,29 +141,21 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["bun.install", "nb_vite.deps"])
+         quote(do: ["bun.install"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["compile", "bun.install", "nb_vite.deps", "nb_vite build"])
+         quote(do: ["compile", "nb_vite.deps", "nb_vite build"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(
-           do: [
-             "compile",
-             "bun.install",
-             "nb_vite.deps",
-             "nb_vite build",
-             "phx.digest"
-           ]
-         )
+         quote(do: ["compile", "nb_vite.deps", "nb_vite build", "phx.digest"])
        )}
     end)
   end
@@ -255,7 +242,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
           raise "No package manager found. Please install npm, bun, pnpm, or yarn."
 
       cond do
-        npm_path =~ "bun" -> "bun install --cwd assets"
+        npm_path =~ "bun" -> "mix bun assets install"
         npm_path =~ "pnpm" -> "pnpm install --prefix assets"
         npm_path =~ "yarn" -> "cd assets && yarn install"
         true -> "npm install --prefix assets"

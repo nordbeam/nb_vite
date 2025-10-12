@@ -194,7 +194,7 @@ if Code.ensure_loaded?(Igniter) do
       additional_opts = build_additional_options(options)
 
       path_import =
-        if options[:shadcn] || is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
+        if is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
 
       """
       import { defineConfig } from 'vite'
@@ -226,7 +226,7 @@ if Code.ensure_loaded?(Igniter) do
       extension = if options[:typescript], do: "tsx", else: "jsx"
 
       path_import =
-        if options[:shadcn] || is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
+        if is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
 
       """
       import { defineConfig } from 'vite'
@@ -916,45 +916,6 @@ if Code.ensure_loaded?(Igniter) do
       end)
     end
 
-    def maybe_setup_shadcn(igniter) do
-      if igniter.args.options[:shadcn] do
-        # Queue the shadcn init command to run after npm install
-        base_color = igniter.args.options[:base_color] || "neutral"
-
-        # Determine which package manager command to use
-        shadcn_cmd =
-          case BunIntegration.install_command(igniter) do
-            nil ->
-              [
-                "cmd",
-                [
-                  "bunx --bun shadcn@latest init -y --base-color #{base_color} --css-variables --cwd assets"
-                ]
-              ]
-
-            install_cmd when is_binary(install_cmd) ->
-              runner =
-                cond do
-                  install_cmd =~ "bun" -> "bunx"
-                  install_cmd =~ "pnpm" -> "pnpm dlx"
-                  install_cmd =~ "yarn" -> "yarn dlx"
-                  true -> "npx"
-                end
-
-              [
-                "cmd",
-                [
-                  "#{runner} shadcn@latest init -y --base-color #{base_color} --css-variables --cwd assets"
-                ]
-              ]
-          end
-
-        Igniter.add_task(igniter, Enum.at(shadcn_cmd, 0), Enum.at(shadcn_cmd, 1))
-      else
-        igniter
-      end
-    end
-
     def print_next_steps(igniter) do
       notices = build_installation_notices(igniter.args.options)
 
@@ -976,7 +937,6 @@ if Code.ensure_loaded?(Igniter) do
       # Bun notice is now handled by BunIntegration
       notices = maybe_add_typescript_notice(notices, options)
       notices = maybe_add_inertia_notice(notices, options)
-      notices = maybe_add_shadcn_notice(notices, options)
 
       notices ++ [build_documentation_notice()]
     end
@@ -1042,32 +1002,6 @@ if Code.ensure_loaded?(Igniter) do
         notes ++ ["- Browser history encryption is enabled for security"]
       else
         notes
-      end
-    end
-
-    defp maybe_add_shadcn_notice(notices, options) do
-      if Keyword.get(options, :shadcn) do
-        base_color = Keyword.get(options, :base_color, "zinc")
-
-        notice = """
-        shadcn/ui Configuration:
-        - shadcn/ui has been initialized with the #{base_color} theme
-        - Components will be installed in assets/js/components/ui/
-        - CSS variables are configured for easy theming
-        - Use the cn() utility from @/lib/utils for className merging
-
-        To add components:
-          cd assets && npx shadcn@latest add button
-
-        Example usage:
-          import { Button } from "@/components/ui/button"
-
-          <Button variant="outline">Click me</Button>
-        """
-
-        notices ++ [notice]
-      else
-        notices
       end
     end
 

@@ -19,19 +19,7 @@ defmodule Mix.Tasks.NbVite do
 
   @impl true
   def run(args) do
-    # Use the bun binary from the bun Mix package (environment-agnostic location)
-    # The bun package installs to _build/bun, not _build/ENV/bun
-    build_root = Path.dirname(Mix.Project.build_path())
-    bun_path = Path.join(build_root, "bun")
-
-    unless File.exists?(bun_path) do
-      raise """
-      Bun binary not found at #{bun_path}
-      Please run: mix bun.install
-      """
-    end
-
-    # Get assets directory path
+    # Verify assets directory exists
     assets_dir = Path.join(File.cwd!(), "assets")
 
     unless File.exists?(assets_dir) do
@@ -68,7 +56,8 @@ defmodule Mix.Tasks.NbVite do
       |> maybe_add_env("RENDER")
       |> maybe_add_env("RAILWAY_ENVIRONMENT")
 
-    Mix.shell().cmd("cd #{assets_dir} && #{bun_path} #{Enum.join(cmd_args, " ")}", env: env)
+    # Use mix bun assets to leverage the cd configuration
+    Mix.shell().cmd("mix bun assets #{Enum.join(cmd_args, " ")}", env: env)
   end
 
   defp node_env do
@@ -138,27 +127,13 @@ defmodule Mix.Tasks.NbVite.Deps do
 
   @impl true
   def run(_args) do
-    # Use the bun binary from the bun Mix package (environment-agnostic location)
-    # The bun package installs to _build/bun, not _build/ENV/bun
-    build_root = Path.dirname(Mix.Project.build_path())
-    bun_path = Path.join(build_root, "bun")
-
-    unless File.exists?(bun_path) do
-      raise """
-      Bun binary not found at #{bun_path}
-      Please run: mix bun.install
-      """
-    end
-
     assets_dir = Path.join(File.cwd!(), "assets")
 
     unless File.exists?(assets_dir) do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    # Use bun with --cwd flag to install in assets directory
-    cmd = "#{bun_path} --cwd #{assets_dir} install"
-
-    Mix.shell().cmd(cmd)
+    # Use mix bun assets to leverage the cd configuration
+    Mix.Task.run("bun", ["assets", "install"])
   end
 end
