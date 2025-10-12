@@ -19,8 +19,10 @@ defmodule Mix.Tasks.NbVite do
 
   @impl true
   def run(args) do
-    # Use the bun binary from the bun Mix package
-    bun_path = Path.join(Mix.Project.build_path(), "bun")
+    # Use the bun binary from the bun Mix package (environment-agnostic location)
+    # The bun package installs to _build/bun, not _build/ENV/bun
+    build_root = Path.dirname(Mix.Project.build_path())
+    bun_path = Path.join(build_root, "bun")
 
     unless File.exists?(bun_path) do
       raise """
@@ -136,8 +138,10 @@ defmodule Mix.Tasks.NbVite.Deps do
 
   @impl true
   def run(_args) do
-    # Use the bun binary from the bun Mix package
-    bun_path = Path.join(Mix.Project.build_path(), "bun")
+    # Use the bun binary from the bun Mix package (environment-agnostic location)
+    # The bun package installs to _build/bun, not _build/ENV/bun
+    build_root = Path.dirname(Mix.Project.build_path())
+    bun_path = Path.join(build_root, "bun")
 
     unless File.exists?(bun_path) do
       raise """

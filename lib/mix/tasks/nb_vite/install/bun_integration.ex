@@ -146,14 +146,14 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["bun.install --if-missing", "nb_vite.deps"])
+         quote(do: ["bun.install", "nb_vite.deps"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["compile", "bun.install --if-missing", "nb_vite.deps", "nb_vite build"])
+         quote(do: ["compile", "bun.install", "nb_vite.deps", "nb_vite build"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
@@ -163,7 +163,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
          quote(
            do: [
              "compile",
-             "bun.install --if-missing",
+             "bun.install",
              "nb_vite.deps",
              "nb_vite build",
              "phx.digest"
