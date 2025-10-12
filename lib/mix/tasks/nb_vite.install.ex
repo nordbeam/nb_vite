@@ -857,27 +857,35 @@ if Code.ensure_loaded?(Igniter) do
       if BunIntegration.using_bun?(igniter) do
         igniter
       else
-        # Use nb_vite tasks (which detect package manager automatically)
+        # Use bun.install to get the bun binary, then nb_vite.deps to install deps
         igniter
         |> Igniter.Project.TaskAliases.modify_existing_alias("assets.setup", fn zipper ->
           {:ok,
            Sourceror.Zipper.replace(
              zipper,
-             quote(do: ["nb_vite.install --if-missing", "nb_vite.deps"])
+             quote(do: ["bun.install --if-missing", "nb_vite.deps"])
            )}
         end)
         |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
           {:ok,
            Sourceror.Zipper.replace(
              zipper,
-             quote(do: ["compile", "nb_vite.deps", "nb_vite build"])
+             quote(do: ["compile", "bun.install --if-missing", "nb_vite.deps", "nb_vite build"])
            )}
         end)
         |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
           {:ok,
            Sourceror.Zipper.replace(
              zipper,
-             quote(do: ["compile", "nb_vite.deps", "nb_vite build", "phx.digest"])
+             quote(
+               do: [
+                 "compile",
+                 "bun.install --if-missing",
+                 "nb_vite.deps",
+                 "nb_vite build",
+                 "phx.digest"
+               ]
+             )
            )}
         end)
       end

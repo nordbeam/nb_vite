@@ -19,12 +19,14 @@ defmodule Mix.Tasks.NbVite do
 
   @impl true
   def run(args) do
-    npm_path =
-      find_executable("bun") || find_executable("npm") || find_executable("pnpm") ||
-        find_executable("yarn")
+    # Use the bun binary from the bun Mix package
+    bun_path = Path.join(Mix.Project.build_path(), "bun")
 
-    unless npm_path do
-      raise "No package manager found. Please install npm, bun, pnpm, or yarn."
+    unless File.exists?(bun_path) do
+      raise """
+      Bun binary not found at #{bun_path}
+      Please run: mix bun.install
+      """
     end
 
     # Get assets directory path
@@ -34,12 +36,7 @@ defmodule Mix.Tasks.NbVite do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    cmd_args =
-      if npm_path =~ "bun" do
-        ["x", "--bun", "vite"] ++ args
-      else
-        ["run", "vite"] ++ args
-      end
+    cmd_args = ["x", "--bun", "vite"] ++ args
 
     # Pass through important environment variables
     env = [
@@ -69,11 +66,7 @@ defmodule Mix.Tasks.NbVite do
       |> maybe_add_env("RENDER")
       |> maybe_add_env("RAILWAY_ENVIRONMENT")
 
-    Mix.shell().cmd("cd #{assets_dir} && #{npm_path} #{Enum.join(cmd_args, " ")}", env: env)
-  end
-
-  defp find_executable(name) do
-    System.find_executable(name)
+    Mix.shell().cmd("cd #{assets_dir} && #{bun_path} #{Enum.join(cmd_args, " ")}", env: env)
   end
 
   defp node_env do
@@ -128,25 +121,29 @@ end
 
 defmodule Mix.Tasks.NbVite.Deps do
   @moduledoc """
-  Installs JavaScript dependencies.
+  Installs JavaScript dependencies using the Bun binary from the bun Mix package.
 
   Usage:
 
-      $ mix vite.deps
+      $ mix nb_vite.deps
 
+  This task uses the Bun binary downloaded by the bun Mix package.
+  Make sure to run `mix bun.install` first if you haven't already.
   """
-  @shortdoc "Installs JavaScript dependencies"
+  @shortdoc "Installs JavaScript dependencies using Bun"
 
   use Mix.Task
 
   @impl true
   def run(_args) do
-    npm_path =
-      find_executable("bun") || find_executable("npm") || find_executable("pnpm") ||
-        find_executable("yarn")
+    # Use the bun binary from the bun Mix package
+    bun_path = Path.join(Mix.Project.build_path(), "bun")
 
-    unless npm_path do
-      raise "No package manager found. Please install npm, bun, pnpm, or yarn."
+    unless File.exists?(bun_path) do
+      raise """
+      Bun binary not found at #{bun_path}
+      Please run: mix bun.install
+      """
     end
 
     assets_dir = Path.join(File.cwd!(), "assets")
@@ -155,26 +152,9 @@ defmodule Mix.Tasks.NbVite.Deps do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    install_cmd =
-      cond do
-        npm_path =~ "yarn" -> "install"
-        npm_path =~ "bun" -> "install"
-        npm_path =~ "pnpm" -> "install"
-        true -> "ci --progress=false --no-audit --loglevel=error"
-      end
-
-    # For bun, we use --cwd so no need to cd. For others, cd to assets dir.
-    cmd =
-      if npm_path =~ "bun" do
-        "#{npm_path} --cwd #{assets_dir} #{install_cmd}"
-      else
-        "cd #{assets_dir} && #{npm_path} #{install_cmd}"
-      end
+    # Use bun with --cwd flag to install in assets directory
+    cmd = "#{bun_path} --cwd #{assets_dir} install"
 
     Mix.shell().cmd(cmd)
-  end
-
-  defp find_executable(name) do
-    System.find_executable(name)
   end
 end
