@@ -27,43 +27,33 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
             ]}
 
   @doc """
-  Integrates Bun into the project when --bun flag is specified.
+  Integrates Bun into the project.
 
-  This performs all Bun-specific setup in a coordinated way:
+  This performs all Bun setup by default:
   1. Adds the bun Mix dependency
-  2. Configures bun version and assets profile
+  2. Configures bun version and profiles
   3. Sets up Bun-specific mix aliases
-  4. Configures the development watcher to use _build/bun
+  4. Configures the development watcher to use Bun module
   5. Updates package.json to use Bun workspaces
   6. Adds helpful notice about Bun configuration
   """
   def integrate(igniter) do
-    if should_integrate?(igniter) do
-      igniter
-      |> add_dependency()
-      |> configure_bun_version()
-      |> setup_mix_aliases()
-      |> setup_watcher()
-      |> setup_workspaces()
-      |> add_notice()
-      |> validate_setup()
-    else
-      igniter
-    end
-  end
-
-  @doc """
-  Checks if Bun integration should be performed.
-  """
-  def should_integrate?(igniter) do
-    igniter.args.options[:bun] || false
+    igniter
+    |> add_dependency()
+    |> configure_bun_version()
+    |> setup_mix_aliases()
+    |> setup_watcher()
+    |> setup_workspaces()
+    |> add_notice()
+    |> validate_setup()
   end
 
   @doc """
   Checks if the project is using Bun integration.
+  Always returns true since Bun is now the default.
   """
-  def using_bun?(igniter) do
-    should_integrate?(igniter)
+  def using_bun?(_igniter) do
+    true
   end
 
   @doc """
@@ -156,27 +146,29 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(
-           do: [
-             "nb_vite.install --if-missing",
-             "bun.install --if-missing",
-             "bun assets"
-           ]
-         )
+         quote(do: ["bun.install --if-missing", "nb_vite.deps"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["compile", "bun assets", "bun build"])
+         quote(do: ["compile", "bun.install --if-missing", "nb_vite.deps", "nb_vite build"])
        )}
     end)
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["compile", "bun assets", "bun build", "phx.digest"])
+         quote(
+           do: [
+             "compile",
+             "bun.install --if-missing",
+             "nb_vite.deps",
+             "nb_vite build",
+             "phx.digest"
+           ]
+         )
        )}
     end)
   end

@@ -60,31 +60,19 @@ if Code.ensure_loaded?(Igniter) do
       |> setup_html_helpers()
       |> create_vite_config()
       |> update_package_json()
-      |> setup_watcher_for_system_package_managers()
       |> remove_old_watchers()
       |> update_root_layout()
       |> setup_assets()
-      |> update_mix_aliases_for_system_package_managers()
       |> print_next_steps()
     end
 
-    # Bun integration is now handled by BunIntegration.integrate/1
-
-    # Test helpers - these delegate to the appropriate functions
+    # Test helpers - delegate to BunIntegration since Bun is now always used
     def update_mix_aliases(igniter) do
-      if BunIntegration.using_bun?(igniter) do
-        BunIntegration.integrate(igniter)
-      else
-        update_mix_aliases_for_system_package_managers(igniter)
-      end
+      BunIntegration.integrate(igniter)
     end
 
     def setup_watcher(igniter) do
-      if BunIntegration.using_bun?(igniter) do
-        BunIntegration.integrate(igniter)
-      else
-        setup_watcher_for_system_package_managers(igniter)
-      end
+      BunIntegration.integrate(igniter)
     end
 
     def maybe_add_bun_dep(igniter) do
@@ -557,70 +545,9 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
-    def setup_watcher_for_system_package_managers(igniter) do
-      # Bun watcher is handled by BunIntegration
-      if BunIntegration.using_bun?(igniter) do
-        igniter
-      else
-        case Igniter.Libs.Phoenix.select_endpoint(igniter) do
-          {igniter, nil} ->
-            Igniter.add_warning(
-              igniter,
-              "Could not find Phoenix endpoint. Vite watcher was not configured. You may need to manually add the Vite watcher to your dev.exs configuration."
-            )
-
-          {igniter, endpoint} ->
-            app_name = Igniter.Project.Application.app_name(igniter)
-            is_phoenix_1_8 = is_phoenix_1_8?(igniter)
-            phoenix_version = if is_phoenix_1_8, do: "1.8", else: "1.7"
-
-            # Use Vite directly with npm/yarn/pnpm
-            watcher_value =
-              if is_phoenix_1_8 do
-                {:code,
-                 quote do
-                   [
-                     "node_modules/.bin/vite",
-                     "dev",
-                     cd: Path.expand("../assets", __DIR__),
-                     env: [
-                       {"PHX_BUILD_PATH", Mix.Project.build_path()},
-                       {"PHX_APP_NAME", unquote(to_string(app_name))},
-                       {"PHX_VERSION", unquote(phoenix_version)}
-                     ]
-                   ]
-                 end}
-              else
-                {:code,
-                 Sourceror.parse_string!("""
-                 ["node_modules/.bin/vite", "dev", cd: Path.expand("../assets", __DIR__)]
-                 """)}
-              end
-
-            case Igniter.Project.Config.configure(
-                   igniter,
-                   "dev.exs",
-                   app_name,
-                   [endpoint, :watchers, :node],
-                   watcher_value
-                 ) do
-              {:error, igniter} ->
-                Igniter.add_warning(
-                  igniter,
-                  "Could not configure Vite watcher in dev.exs. You may need to manually add the watcher configuration."
-                )
-
-              result ->
-                result
-            end
-        end
-      end
-    end
-
     def remove_old_watchers(igniter) do
       case Igniter.Libs.Phoenix.select_endpoint(igniter) do
         {igniter, nil} ->
-          # Already warned in setup_watcher_for_system_package_managers
           igniter
 
         {igniter, endpoint} ->
@@ -850,45 +777,6 @@ if Code.ensure_loaded?(Igniter) do
         "include": ["js/**/*"]
       }
       """
-    end
-
-    def update_mix_aliases_for_system_package_managers(igniter) do
-      # Bun aliases are handled by BunIntegration
-      if BunIntegration.using_bun?(igniter) do
-        igniter
-      else
-        # Use bun.install to get the bun binary, then nb_vite.deps to install deps
-        igniter
-        |> Igniter.Project.TaskAliases.modify_existing_alias("assets.setup", fn zipper ->
-          {:ok,
-           Sourceror.Zipper.replace(
-             zipper,
-             quote(do: ["bun.install --if-missing", "nb_vite.deps"])
-           )}
-        end)
-        |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
-          {:ok,
-           Sourceror.Zipper.replace(
-             zipper,
-             quote(do: ["compile", "bun.install --if-missing", "nb_vite.deps", "nb_vite build"])
-           )}
-        end)
-        |> Igniter.Project.TaskAliases.modify_existing_alias("assets.deploy", fn zipper ->
-          {:ok,
-           Sourceror.Zipper.replace(
-             zipper,
-             quote(
-               do: [
-                 "compile",
-                 "bun.install --if-missing",
-                 "nb_vite.deps",
-                 "nb_vite build",
-                 "phx.digest"
-               ]
-             )
-           )}
-        end)
-      end
     end
 
     defp detect_topbar(igniter) do
