@@ -193,13 +193,13 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
     - Phoenix JS dependencies are managed via Bun workspaces
     - Your dev watcher uses: `{Bun, :install_and_run, [:dev, []]}`
     - Assets are built with: `mix bun build`
-    - To install dependencies manually: `mix bun assets`
+    - To install dependencies manually: `mix bun assets install`
     """
 
     igniter
     |> Igniter.add_notice(notice)
     |> Igniter.add_task("bun.install", ["--if-missing"])
-    |> Igniter.add_task("bun", ["assets"])
+    |> Igniter.add_task("bun", ["assets", "install"])
   end
 
   defp validate_setup(igniter) do
