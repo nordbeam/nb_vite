@@ -176,7 +176,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       {:ok,
        Sourceror.Zipper.replace(
          zipper,
-         quote(do: ["bun assets", "bun build", "phx.digest"])
+         quote(do: ["compile", "bun assets", "bun build", "phx.digest"])
        )}
     end)
   end

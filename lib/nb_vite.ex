@@ -210,7 +210,13 @@ defmodule NbVite do
   end
 
   defp get_hot_file_path do
-    Application.get_env(:nb_vite, :hot_file, Path.join([File.cwd!(), "priv", "hot"]))
+    default_path =
+      case app_priv_dir() do
+        {:ok, priv_dir} -> Path.join(priv_dir, "hot")
+        :error -> Path.join([File.cwd!(), "priv", "hot"])
+      end
+
+    Application.get_env(:nb_vite, :hot_file, default_path)
   end
 
   defp load_manifest do
@@ -229,10 +235,35 @@ defmodule NbVite do
   end
 
   defp get_manifest_path do
-    Application.get_env(
-      :nb_vite,
-      :manifest_path,
-      Path.join([File.cwd!(), "priv", "static", "assets", "manifest.json"])
-    )
+    default_path =
+      case app_priv_dir() do
+        {:ok, priv_dir} ->
+          Path.join([priv_dir, "static", "assets", "manifest.json"])
+
+        :error ->
+          Path.join([File.cwd!(), "priv", "static", "assets", "manifest.json"])
+      end
+
+    Application.get_env(:nb_vite, :manifest_path, default_path)
+  end
+
+  defp app_priv_dir do
+    # Try to get the priv directory for the application that's using nb_vite
+    # This requires :otp_app to be configured in config.exs:
+    #   config :nb_vite, otp_app: :my_app
+    app_name = Application.get_env(:nb_vite, :otp_app)
+
+    case app_name do
+      nil ->
+        # No OTP app configured, fall back to File.cwd!() (works in dev)
+        :error
+
+      app when is_atom(app) ->
+        # Use :code.priv_dir for the configured app (works in releases)
+        case :code.priv_dir(app) do
+          {:error, _} -> :error
+          priv_dir -> {:ok, to_string(priv_dir)}
+        end
+    end
   end
 end

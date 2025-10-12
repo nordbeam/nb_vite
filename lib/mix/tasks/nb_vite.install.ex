@@ -56,6 +56,7 @@ if Code.ensure_loaded?(Igniter) do
 
       igniter
       |> BunIntegration.integrate()
+      |> configure_otp_app()
       |> setup_html_helpers()
       |> create_vite_config()
       |> update_package_json()
@@ -92,6 +93,18 @@ if Code.ensure_loaded?(Igniter) do
 
     def maybe_setup_bun_config(igniter) do
       BunIntegration.integrate(igniter)
+    end
+
+    def configure_otp_app(igniter) do
+      app_name = Igniter.Project.Application.app_name(igniter)
+
+      Igniter.Project.Config.configure(
+        igniter,
+        "config.exs",
+        :nb_vite,
+        [:otp_app],
+        app_name
+      )
     end
 
     def setup_html_helpers(igniter) do
@@ -176,42 +189,6 @@ if Code.ensure_loaded?(Igniter) do
       config = build_vite_config(simplified_options, has_tailwind, is_phoenix_1_8, app_name)
 
       Igniter.create_new_file(igniter, "assets/vite.config.js", config, on_exists: :skip)
-    end
-
-    defp copy_phoenix_plugin(igniter) do
-      # Read the phoenix plugin from nb_vite priv directory
-      priv_dir = :code.priv_dir(:nb_vite)
-      plugin_source = Path.join([priv_dir, "static", "nb_vite", "index.js"])
-      html_source = Path.join([priv_dir, "static", "nb_vite", "dev-server-index.html"])
-
-      # Copy phoenix plugin to assets/vite-plugins/phoenix.js
-      igniter =
-        case File.read(plugin_source) do
-          {:ok, content} ->
-            Igniter.create_new_file(igniter, "assets/vite-plugins/phoenix.js", content,
-              on_exists: :overwrite
-            )
-
-          {:error, _} ->
-            Igniter.add_warning(
-              igniter,
-              "Could not find phoenix plugin at #{plugin_source}. The plugin may need to be copied manually."
-            )
-        end
-
-      # Copy dev-server-index.html to assets/vite-plugins/
-      case File.read(html_source) do
-        {:ok, content} ->
-          Igniter.create_new_file(igniter, "assets/vite-plugins/dev-server-index.html", content,
-            on_exists: :overwrite
-          )
-
-        {:error, _} ->
-          Igniter.add_warning(
-            igniter,
-            "Could not find dev-server-index.html at #{html_source}. The file may need to be copied manually."
-          )
-      end
     end
 
     defp build_vite_config(options, has_tailwind, is_phoenix_1_8, app_name) do
@@ -376,21 +353,6 @@ if Code.ensure_loaded?(Igniter) do
 
       entry_extension = if typescript, do: "ts", else: "js"
       "['js/app.#{entry_extension}', 'css/app.css']"
-    end
-
-    defp determine_entry_extension(typescript, react) do
-      cond do
-        react && typescript -> "tsx"
-        react -> "jsx"
-        typescript -> "ts"
-        true -> "js"
-      end
-    end
-
-    defp determine_app_extension(typescript, _react) do
-      # For root.html.heex, we always use app.js or app.ts
-      # The JSX/TSX files are separate entry points for React
-      if typescript, do: "ts", else: "js"
     end
 
     defp build_additional_options(options) do
@@ -850,47 +812,6 @@ if Code.ensure_loaded?(Igniter) do
       igniter
     end
 
-    defp react_app_content(_extension) do
-      """
-      import React from "react"
-      import { createRoot } from "react-dom/client"
-
-      // Phoenix specific imports
-      import "phoenix_html"
-      import { Socket } from "phoenix"
-      import { LiveSocket } from "phoenix_live_view"
-
-      // Example React component
-      function App() {
-        return (
-          <div className="app">
-            <h1>Welcome to Phoenix with Vite and React!</h1>
-          </div>
-        )
-      }
-
-      // Mount React app if there's a root element
-      const rootElement = document.getElementById("react-root")
-      if (rootElement) {
-        const root = createRoot(rootElement)
-        root.render(<App />)
-      }
-
-      // Phoenix LiveView setup
-      let csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content")
-      let liveSocket = new LiveSocket("/live", Socket, {
-        longPollFallbackMs: 2500,
-        params: { _csrf_token: csrfToken }
-      })
-
-      // Connect if there are any LiveViews on the page
-      liveSocket.connect()
-
-      // Expose liveSocket on window for web console debug logs and latency simulation
-      window.liveSocket = liveSocket
-      """
-    end
-
     defp maybe_create_typescript_config(igniter, false), do: igniter
 
     defp maybe_create_typescript_config(igniter, true) do
@@ -931,37 +852,6 @@ if Code.ensure_loaded?(Igniter) do
       """
     end
 
-    defp react_tsconfig_json do
-      """
-      {
-        "compilerOptions": {
-          "baseUrl": ".",
-          "paths": {
-            "@/*": ["./js/*"]
-          },
-          "target": "ES2020",
-          "useDefineForClassFields": true,
-          "lib": ["ES2020", "DOM", "DOM.Iterable"],
-          "module": "ESNext",
-          "skipLibCheck": true,
-          "moduleResolution": "bundler",
-          "allowImportingTsExtensions": true,
-          "resolveJsonModule": true,
-          "isolatedModules": true,
-          "moduleDetection": "force",
-          "noEmit": true,
-          "jsx": "react-jsx",
-          "strict": true,
-          "noUnusedLocals": true,
-          "noUnusedParameters": true,
-          "noFallthroughCasesInSwitch": true,
-          "noUncheckedSideEffectImports": true
-        },
-        "include": ["js/**/*"]
-      }
-      """
-    end
-
     def update_mix_aliases_for_system_package_managers(igniter) do
       # Bun aliases are handled by BunIntegration
       if BunIntegration.using_bun?(igniter) do
@@ -987,7 +877,7 @@ if Code.ensure_loaded?(Igniter) do
           {:ok,
            Sourceror.Zipper.replace(
              zipper,
-             quote(do: ["nb_vite.deps", "nb_vite build", "phx.digest"])
+             quote(do: ["compile", "nb_vite.deps", "nb_vite build", "phx.digest"])
            )}
         end)
       end

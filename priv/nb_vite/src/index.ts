@@ -1126,8 +1126,29 @@ function checkCommonConfigurationIssues(
   if (!fs.existsSync(depsPath)) {
     console.warn(
       `\n[vite] ${colors.yellow("Warning")}: Phoenix deps directory not found at ${depsPath}.\n` +
-        `Make sure you're running Vite from the correct directory (usually the 'assets' folder).\n`,
+        `Make sure you're running Vite from the correct directory (usually the 'assets' folder).\n` +
+        `If you're building in Docker, ensure the deps are available at build time.\n`,
     );
+  }
+
+  // Check for critical node_modules that might cause config loading to fail
+  const nodeModulesPath = path.resolve(process.cwd(), "node_modules");
+  if (!fs.existsSync(nodeModulesPath)) {
+    console.error(
+      `\n[vite] ${colors.red("Error")}: node_modules directory not found.\n` +
+        `Run 'npm install' (or yarn/pnpm/bun install) before building.\n` +
+        `If you're building in Docker, ensure dependencies are installed in your Dockerfile before running the build.\n`,
+    );
+  } else {
+    // Check for critical Vite dependency
+    const vitePath = path.resolve(nodeModulesPath, "vite");
+    if (!fs.existsSync(vitePath)) {
+      console.error(
+        `\n[vite] ${colors.red("Error")}: Vite is not installed in node_modules.\n` +
+          `Run 'npm install vite' to install it.\n` +
+          `If you're using a workspace setup in Docker, ensure all dependencies are properly hoisted.\n`,
+      );
+    }
   }
 
   // Warn if hot file directory doesn't exist

@@ -51,6 +51,10 @@ See [REFACTORING_NOTES.md](REFACTORING_NOTES.md) for details on the split from V
 
 Full documentation available at [hexdocs.pm/nb_vite](https://hexdocs.pm/nb_vite/).
 
+### Deployment
+
+- **[Docker & Release Guide](DOCKER.md)** - Complete guide for deploying with Docker and Elixir releases
+
 ## License
 
 MIT License - see [LICENSE](LICENSE)
