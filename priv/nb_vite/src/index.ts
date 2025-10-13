@@ -789,7 +789,8 @@ function resolvePhoenixPlugin(
           x: string | AddressInfo | null | undefined,
         ): x is AddressInfo => typeof x === "object";
         if (isAddressInfo(address)) {
-          viteDevServerUrl = userConfig.server?.origin
+          // Support empty string origin for relative URLs (works with reverse proxies)
+          viteDevServerUrl = userConfig.server?.origin !== undefined
             ? (userConfig.server.origin as DevServerUrl)
             : resolveDevServerUrl(address, server.config, userConfig);
 

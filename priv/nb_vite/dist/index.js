@@ -2741,7 +2741,8 @@ function resolvePhoenixPlugin(pluginConfig) {
                 const address = server.httpServer?.address();
                 const isAddressInfo = (x) => typeof x === "object";
                 if (isAddressInfo(address)) {
-                    viteDevServerUrl = userConfig.server?.origin
+                    // Support empty string origin for relative URLs (works with reverse proxies)
+                    viteDevServerUrl = userConfig.server?.origin !== undefined
                         ? userConfig.server.origin
                         : resolveDevServerUrl(address, server.config, userConfig);
                     // Write hot file with error handling
