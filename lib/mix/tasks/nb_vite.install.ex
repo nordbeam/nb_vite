@@ -38,6 +38,8 @@ if Code.ensure_loaded?(Igniter) do
     @impl Igniter.Mix.Task
     def info(_argv, _parent) do
       %Igniter.Mix.Task.Info{
+        group: :nb,
+        example: "mix nb_vite.install --typescript --tls",
         schema: [
           typescript: :boolean,
           tls: :boolean,
@@ -55,6 +57,7 @@ if Code.ensure_loaded?(Igniter) do
       igniter = detect_phoenix_1_8(igniter)
 
       igniter
+      |> Igniter.Project.Formatter.import_dep(:nb_vite)
       |> BunIntegration.integrate()
       |> configure_otp_app()
       |> setup_html_helpers()
