@@ -2457,6 +2457,12 @@ async function setupSSREndpoint(viteServer, ssrConfig) {
         if (!file.startsWith(jsDir) || !file.match(/\.(tsx?|jsx?)$/)) {
             return;
         }
+        // Skip auto-generated files that don't affect SSR
+        const fileName = file.split('/').pop() || '';
+        if (fileName === 'routes.js' || fileName === 'routes.d.ts') {
+            console.log(`[vite:ssr] Skipping SSR cache invalidation for: ${file.replace(viteServer.config.root, '')}`);
+            return;
+        }
         console.log(`[vite:ssr] File changed: ${file.replace(viteServer.config.root, '')}`);
         // Invalidate the changed module
         const mods = await viteServer.moduleGraph.getModulesByFile(file);
