@@ -92,6 +92,13 @@ export function ssrEndpoint(options: SSREndpointOptions = {}): Plugin {
           return;
         }
 
+        // Skip auto-generated files that don't affect SSR
+        const fileName = file.split('/').pop() || '';
+        if (fileName === 'routes.js' || fileName === 'routes.d.ts') {
+          console.log(`[ssr-plugin] Skipping SSR cache invalidation for: ${file.replace(viteServer.config.root, '')}`);
+          return;
+        }
+
         console.log(`[ssr-plugin] File changed: ${file.replace(viteServer.config.root, '')}`);
 
         // Invalidate the changed module
