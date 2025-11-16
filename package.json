@@ -9,6 +9,10 @@
     ".": {
       "import": "./priv/nb_vite/dist/index.js",
       "types": "./priv/nb_vite/dist/index.d.ts"
+    },
+    "./nb-routes": {
+      "import": "./priv/nb_vite/dist/vite-plugin-nb-routes.js",
+      "types": "./priv/nb_vite/dist/vite-plugin-nb-routes.d.ts"
     }
   },
   "files": [

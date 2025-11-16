@@ -215,13 +215,20 @@ export function ssrEndpoint(options: SSREndpointOptions = {}): Plugin {
         } catch (error) {
           console.error('[ssr-plugin] Render error:', error);
 
+          // Extract error details
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
+
+          // Normalize empty stacks to undefined
+          const normalizedStack = errorStack && errorStack.trim() !== '' ? errorStack : undefined;
+
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
             success: false,
             error: {
-              message: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
+              message: errorMessage,
+              stack: normalizedStack,
             },
           }));
         }
