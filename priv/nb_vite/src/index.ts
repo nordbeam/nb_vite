@@ -22,26 +22,7 @@ import fullReload, {
   Config as FullReloadConfig,
 } from "vite-plugin-full-reload";
 
-// Dynamic imports for optional SSR dependencies
-let ViteNodeServer: any;
-let ViteNodeRunner: any;
-let installSourcemapsSupport: any;
-
-async function loadViteNodeDependencies() {
-  try {
-    const viteNodeServer = await import("vite-node/server");
-    const viteNodeClient = await import("vite-node/client");
-    const viteNodeSourceMap = await import("vite-node/source-map");
-
-    ViteNodeServer = viteNodeServer.ViteNodeServer;
-    ViteNodeRunner = viteNodeClient.ViteNodeRunner;
-    installSourcemapsSupport = viteNodeSourceMap.installSourcemapsSupport;
-
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
+// No longer need vite-node imports - using built-in Module Runner API
 
 interface SSRConfig {
   /**
@@ -384,44 +365,19 @@ function resolvePluginConfig(
 }
 
 /**
- * Setup SSR endpoint in the Vite dev server
+ * Setup SSR endpoint in the Vite dev server using Module Runner API
  */
 async function setupSSREndpoint(
   viteServer: ViteDevServer,
   ssrConfig: Required<SSRConfig>
 ): Promise<{ cleanup: () => void } | null> {
-  // Try to load vite-node dependencies
-  const loaded = await loadViteNodeDependencies();
-  if (!loaded) {
-    console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: vite-node is not available. SSR dev endpoint will not be enabled.\n` +
-        `Install vite-node to enable SSR: npm install vite-node\n`
-    );
-    return null;
-  }
+  console.log('[vite:ssr] Initializing SSR endpoint with Module Runner...');
 
-  console.log('[vite:ssr] Initializing SSR endpoint...');
-
-  // Create vite-node server
-  // @ts-ignore - vite-node has its own vite version as dependency, types may mismatch
-  const viteNodeServer = new ViteNodeServer(viteServer);
-
-  // Install source map support
-  installSourcemapsSupport({
-    getSourceMap: (source: string) => viteNodeServer.getSourceMap(source),
-  });
-
-  // Create vite-node runner
-  const viteNodeRunner = new ViteNodeRunner({
-    root: viteServer.config.root,
-    base: viteServer.config.base,
-    fetchModule(id: string) {
-      return viteNodeServer.fetchModule(id, "ssr");
-    },
-    resolveId(id: string, importer?: string) {
-      return viteNodeServer.resolveId(id, importer, "ssr");
-    },
-  });
+  // Get the SSR environment and create/access its runner
+  // The runner provides module execution with automatic source map support
+  const ssrEnvironment = viteServer.environments.ssr;
+  // @ts-ignore - runner property exists in Vite 6+ but may not be typed yet
+  const runner = ssrEnvironment.runner || (await ssrEnvironment.createModuleRunner());
 
   let cachedRender: ((page: unknown) => Promise<unknown>) | null = null;
 
@@ -441,7 +397,7 @@ async function setupSSREndpoint(
 
     console.log(`[vite:ssr] File changed: ${file.replace(viteServer.config.root, '')}`);
 
-    // Invalidate the changed module
+    // Invalidate the changed module in the module graph
     const mods = await viteServer.moduleGraph.getModulesByFile(file);
     if (mods) {
       for (const mod of mods) {
@@ -449,8 +405,8 @@ async function setupSSREndpoint(
       }
     }
 
-    // Clear vite-node cache
-    viteNodeRunner.moduleCache.delete(file);
+    // Clear the module runner cache
+    runner.clearCache();
     cachedRender = null;
 
     console.log('[vite:ssr] Cache invalidated - will reload on next request');
@@ -470,11 +426,15 @@ async function setupSSREndpoint(
         }
       }
 
-      // Clear vite-node cache
-      viteNodeRunner.moduleCache.clear();
+      // Clear the module runner cache
+      runner.clearCache();
 
-      // Execute the module
-      const ssrModule = await viteNodeRunner.executeFile(ssrEntryPath) as { render?: (page: unknown) => Promise<unknown> };
+      // Import the module using Module Runner API
+      // This automatically handles:
+      // - Source map support
+      // - Module execution in SSR context
+      // - Proper module resolution
+      const ssrModule = await runner.import(ssrEntryPath) as { render?: (page: unknown) => Promise<unknown> };
 
       if (!ssrModule.render || typeof ssrModule.render !== 'function') {
         throw new Error('SSR entry must export a "render" function');
