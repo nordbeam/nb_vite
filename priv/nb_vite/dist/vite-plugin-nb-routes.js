@@ -44,24 +44,26 @@ function nbRoutes(options = {}) {
     function regenerateRoutes() {
         if (isRegenerating) {
             if (opts.verbose) {
-                console.log('[nb-routes] Regeneration already in progress, skipping...');
+                console.log('[nb-vite:routes] Regeneration already in progress, skipping...');
             }
             return;
         }
         isRegenerating = true;
         if (opts.verbose) {
-            console.log('[nb-routes] Regenerating routes...');
+            console.log('[nb-vite:routes] Regenerating routes...');
         }
         const [cmd, ...args] = opts.command.split(' ');
-        const child = spawn(cmd, args, {
+        const spawnOptions = {
             stdio: 'inherit',
-            shell: true
-        });
+            cwd: opts.cwd || process.cwd(),
+            shell: process.platform === 'win32' // Only use shell on Windows for .bat/.cmd files
+        };
+        const child = spawn(cmd, args, spawnOptions);
         child.on('close', (code) => {
             isRegenerating = false;
             if (code === 0) {
                 if (opts.verbose) {
-                    console.log('[nb-routes] Routes regenerated successfully');
+                    console.log('[nb-vite:routes] Routes regenerated successfully');
                 }
                 // Invalidate the routes module for HMR
                 if (server) {
@@ -69,12 +71,12 @@ function nbRoutes(options = {}) {
                 }
             }
             else {
-                console.error('[nb-routes] Route generation failed with code', code);
+                console.error('[nb-vite:routes] Route generation failed with code', code);
             }
         });
         child.on('error', (err) => {
             isRegenerating = false;
-            console.error('[nb-routes] Error executing route generation:', err);
+            console.error('[nb-vite:routes] Error executing route generation:', err);
         });
     }
     /**
@@ -104,7 +106,7 @@ function nbRoutes(options = {}) {
             const module = server.moduleGraph.getModuleById(modulePath);
             if (module) {
                 if (opts.verbose) {
-                    console.log(`[nb-routes] Invalidating module: ${modulePath}`);
+                    console.log(`[nb-vite:routes] Invalidating module: ${modulePath}`);
                 }
                 server.moduleGraph.invalidateModule(module);
                 server.ws.send({
@@ -115,7 +117,7 @@ function nbRoutes(options = {}) {
             }
         }
         if (opts.verbose) {
-            console.log(`[nb-routes] Module not found in graph, triggering full reload`);
+            console.log(`[nb-vite:routes] Module not found in graph, triggering full reload`);
         }
         // If module not found, trigger a full reload anyway
         server.ws.send({
@@ -145,15 +147,15 @@ function nbRoutes(options = {}) {
             }
             server = devServer;
             if (opts.verbose) {
-                console.log('[nb-routes] Plugin enabled');
-                console.log(`[nb-routes] Watching patterns:`, opts.routerPath);
+                console.log('[nb-vite:routes] Plugin enabled');
+                console.log(`[nb-vite:routes] Watching patterns:`, opts.routerPath);
             }
             // Watch for router file changes using Vite's built-in watcher
             devServer.watcher.on('change', (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (matchesRouterPattern(relativePath)) {
                     if (opts.verbose) {
-                        console.log(`[nb-routes] Detected change: ${relativePath}`);
+                        console.log(`[nb-vite:routes] Detected change: ${relativePath}`);
                     }
                     debouncedRegenerate();
                 }
@@ -171,7 +173,7 @@ function nbRoutes(options = {}) {
             }
             // Generate routes once at build start
             if (opts.verbose) {
-                console.log('[nb-routes] Generating routes for build...');
+                console.log('[nb-vite:routes] Generating routes for build...');
             }
             regenerateRoutes();
         }

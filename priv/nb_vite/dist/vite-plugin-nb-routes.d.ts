@@ -36,6 +36,11 @@ export interface NbRoutesPluginOptions {
      * @default 'mix nb_routes.gen'
      */
     command?: string;
+    /**
+     * Working directory for the command execution
+     * @default process.cwd()
+     */
+    cwd?: string;
 }
 /**
  * Creates a Vite plugin for nb_routes auto-regeneration

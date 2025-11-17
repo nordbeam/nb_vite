@@ -199,7 +199,7 @@ function resolvePluginConfig(
     const resolvedPath = path.resolve(process.cwd(), inputPath);
     if (!fs.existsSync(resolvedPath)) {
       console.warn(
-        `[vite] ${colors.yellow("Warning")}: Input file "${inputPath}" does not exist. Make sure to create it before running Vite.`,
+        `[nb-vite] ${colors.yellow("Warning")}: Input file "${inputPath}" does not exist. Make sure to create it before running Vite.`,
       );
     }
   };
@@ -227,7 +227,7 @@ function resolvePluginConfig(
     const publicDirPath = path.resolve(process.cwd(), config.publicDirectory);
     if (!fs.existsSync(publicDirPath)) {
       console.warn(
-        `[vite] ${colors.yellow("Warning")}: Public directory "${config.publicDirectory}" does not exist. It will be created during build.`,
+        `[nb-vite] ${colors.yellow("Warning")}: Public directory "${config.publicDirectory}" does not exist. It will be created during build.`,
       );
     }
   }
@@ -371,7 +371,7 @@ async function setupSSREndpoint(
   viteServer: ViteDevServer,
   ssrConfig: Required<SSRConfig>
 ): Promise<{ cleanup: () => void } | null> {
-  console.log('[vite:ssr] Initializing SSR endpoint with Module Runner...');
+  console.log('[nb-vite:ssr] Initializing SSR endpoint with Module Runner...');
 
   // Get the SSR environment and create/access its runner
   // The runner provides module execution with automatic source map support
@@ -391,11 +391,11 @@ async function setupSSREndpoint(
     // Skip auto-generated files that don't affect SSR
     const fileName = file.split('/').pop() || '';
     if (fileName === 'routes.js' || fileName === 'routes.d.ts') {
-      console.log(`[vite:ssr] Skipping SSR cache invalidation for: ${file.replace(viteServer.config.root, '')}`);
+      console.log(`[nb-vite:ssr] Skipping SSR cache invalidation for: ${file.replace(viteServer.config.root, '')}`);
       return;
     }
 
-    console.log(`[vite:ssr] File changed: ${file.replace(viteServer.config.root, '')}`);
+    console.log(`[nb-vite:ssr] File changed: ${file.replace(viteServer.config.root, '')}`);
 
     // Invalidate the changed module in the module graph
     const mods = await viteServer.moduleGraph.getModulesByFile(file);
@@ -409,14 +409,14 @@ async function setupSSREndpoint(
     runner.clearCache();
     cachedRender = null;
 
-    console.log('[vite:ssr] Cache invalidated - will reload on next request');
+    console.log('[nb-vite:ssr] Cache invalidated - will reload on next request');
   });
 
   // Load the render function
   async function loadRenderFunction(): Promise<(page: unknown) => Promise<unknown>> {
     if (!cachedRender) {
       const ssrEntryPath = path.resolve(viteServer.config.root, ssrConfig.entryPoint!);
-      console.log(`[vite:ssr] Loading SSR entry: ${ssrEntryPath}`);
+      console.log(`[nb-vite:ssr] Loading SSR entry: ${ssrEntryPath}`);
 
       // Invalidate module graph for fresh reload
       const mods = await viteServer.moduleGraph.getModulesByFile(ssrEntryPath);
@@ -441,7 +441,7 @@ async function setupSSREndpoint(
       }
 
       cachedRender = ssrModule.render;
-      console.log('[vite:ssr] SSR render function loaded successfully');
+      console.log('[nb-vite:ssr] SSR render function loaded successfully');
     }
 
     return cachedRender;
@@ -503,7 +503,7 @@ async function setupSSREndpoint(
       const body = await readBody(req);
       const page = JSON.parse(body);
 
-      console.log(`[vite:ssr] Rendering page: ${page.component}`);
+      console.log(`[nb-vite:ssr] Rendering page: ${page.component}`);
 
       // Load render function (cached after first load)
       const render = await loadRenderFunction();
@@ -518,9 +518,9 @@ async function setupSSREndpoint(
         result: result,
       }));
 
-      console.log(`[vite:ssr] Rendered successfully`);
+      console.log(`[nb-vite:ssr] Rendered successfully`);
     } catch (error) {
-      console.error('[vite:ssr] Render error:', error);
+      console.error('[nb-vite:ssr] Render error:', error);
 
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
@@ -534,14 +534,14 @@ async function setupSSREndpoint(
     }
   });
 
-  console.log(`[vite:ssr] SSR endpoint ready at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.path}`);
-  console.log(`[vite:ssr] Health check at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.healthPath}`);
+  console.log(`[nb-vite:ssr] SSR endpoint ready at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.path}`);
+  console.log(`[nb-vite:ssr] Health check at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.healthPath}`);
 
   // Pre-load the render function
   try {
     await loadRenderFunction();
   } catch (error) {
-    console.error('[vite:ssr] Failed to pre-load SSR entry:', error);
+    console.error('[nb-vite:ssr] Failed to pre-load SSR entry:', error);
   }
 
   return {
@@ -797,7 +797,8 @@ function resolvePhoenixPlugin(
                 }
               } catch (error) {
                 console.error(
-                  `\n[vite] ${colors.red("Error")}: Failed to write SSR hot file.\n` +
+                  `
+[nb-vite] ${colors.red("Error")}: Failed to write SSR hot file.\n` +
                     `Path: ${typeof pluginConfig.ssrDev === 'object' ? pluginConfig.ssrDev.hotFile : 'unknown'}\n` +
                     `Error: ${error instanceof Error ? error.message : String(error)}\n`,
                 );
@@ -805,7 +806,8 @@ function resolvePhoenixPlugin(
             }
           } catch (error) {
             console.error(
-              `\n[vite] ${colors.red("Error")}: Failed to write hot file.\n` +
+              `
+[nb-vite] ${colors.red("Error")}: Failed to write hot file.\n` +
                 `Path: ${pluginConfig.hotFile}\n` +
                 `Error: ${error instanceof Error ? error.message : String(error)}\n` +
                 `This may prevent Phoenix from detecting the Vite dev server.\n`,
@@ -977,7 +979,8 @@ function resolvePhoenixPlugin(
 
           if (!fs.existsSync(viteManifestPath)) {
             console.warn(
-              `\n[vite] ${colors.yellow("Warning")}: Vite manifest not found at ${viteManifestPath}\n`
+              `
+[nb-vite] ${colors.yellow("Warning")}: Vite manifest not found at ${viteManifestPath}\n`
             );
             return;
           }
@@ -1039,7 +1042,8 @@ function resolvePhoenixPlugin(
           }
         } catch (error) {
           console.error(
-            `\n[vite] ${colors.red("Error")}: Failed to generate manifest file.\n` +
+            `
+[nb-vite] ${colors.red("Error")}: Failed to generate manifest file.\n` +
               `Path: ${pluginConfig.manifestPath}\n` +
               `Error: ${error instanceof Error ? error.message : String(error)}\n`,
           );
@@ -1061,7 +1065,8 @@ function checkCommonConfigurationIssues(
   // Check if PHX_HOST is not set
   if (!env.PHX_HOST) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: PHX_HOST environment variable is not set.\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: PHX_HOST environment variable is not set.\n` +
         `This may cause CORS issues when accessing your Phoenix app.\n` +
         `Set it in your .env file or shell: export PHX_HOST=localhost:4000\n`,
     );
@@ -1072,7 +1077,8 @@ function checkCommonConfigurationIssues(
     userConfig.server?.port ?? (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173);
   if (env.PHX_HOST && env.PHX_HOST.includes(`:${vitePort}`)) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: PHX_HOST (${env.PHX_HOST}) is using the same port as Vite (${vitePort}).\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: PHX_HOST (${env.PHX_HOST}) is using the same port as Vite (${vitePort}).\n` +
         `This will cause conflicts. Phoenix and Vite must run on different ports.\n`,
     );
   }
@@ -1084,7 +1090,8 @@ function checkCommonConfigurationIssues(
     !userConfig.server?.host
   ) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: Running in WSL without explicit host configuration.\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: Running in WSL without explicit host configuration.\n` +
         `You may need to set server.host to '0.0.0.0' in your vite.config.js for proper access from Windows.\n`,
     );
   }
@@ -1093,7 +1100,8 @@ function checkCommonConfigurationIssues(
   const depsPath = path.resolve(process.cwd(), "../deps");
   if (!fs.existsSync(depsPath)) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: Phoenix deps directory not found at ${depsPath}.\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: Phoenix deps directory not found at ${depsPath}.\n` +
         `Make sure you're running Vite from the correct directory (usually the 'assets' folder).\n` +
         `If you're building in Docker, ensure the deps are available at build time.\n`,
     );
@@ -1103,7 +1111,8 @@ function checkCommonConfigurationIssues(
   const nodeModulesPath = path.resolve(process.cwd(), "node_modules");
   if (!fs.existsSync(nodeModulesPath)) {
     console.error(
-      `\n[vite] ${colors.red("Error")}: node_modules directory not found.\n` +
+      `
+[nb-vite] ${colors.red("Error")}: node_modules directory not found.\n` +
         `Run 'npm install' (or yarn/pnpm/bun install) before building.\n` +
         `If you're building in Docker, ensure dependencies are installed in your Dockerfile before running the build.\n`,
     );
@@ -1112,7 +1121,8 @@ function checkCommonConfigurationIssues(
     const vitePath = path.resolve(nodeModulesPath, "vite");
     if (!fs.existsSync(vitePath)) {
       console.error(
-        `\n[vite] ${colors.red("Error")}: Vite is not installed in node_modules.\n` +
+        `
+[nb-vite] ${colors.red("Error")}: Vite is not installed in node_modules.\n` +
           `Run 'npm install vite' to install it.\n` +
           `If you're using a workspace setup in Docker, ensure all dependencies are properly hoisted.\n`,
       );
@@ -1123,7 +1133,8 @@ function checkCommonConfigurationIssues(
   const hotFileDir = path.dirname(pluginConfig.hotFile);
   if (!fs.existsSync(hotFileDir)) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: Hot file directory "${hotFileDir}" does not exist.\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: Hot file directory "${hotFileDir}" does not exist.\n` +
         `Creating directory to prevent errors...\n`,
     );
     fs.mkdirSync(hotFileDir, { recursive: true });
@@ -1141,7 +1152,8 @@ function checkCommonConfigurationIssues(
     )
   ) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: reactRefresh is enabled but @vitejs/plugin-react is not detected.\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: reactRefresh is enabled but @vitejs/plugin-react is not detected.\n` +
         `Install and configure @vitejs/plugin-react for React refresh to work properly.\n`,
     );
   }
@@ -1153,7 +1165,8 @@ function checkCommonConfigurationIssues(
     (pluginConfig.detectTls || env.VITE_DEV_SERVER_KEY)
   ) {
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: TLS/SSL is configured but MIX_ENV is set to "${env.MIX_ENV}".\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: TLS/SSL is configured but MIX_ENV is set to "${env.MIX_ENV}".\n` +
         `TLS is typically only needed in development. Consider disabling it for other environments.\n`,
     );
   }
@@ -1681,7 +1694,8 @@ function resolveDevelopmentEnvironmentServerConfig(
   if (detectTls !== null) {
     const uniquePaths = [...new Set(searchPaths)];
     console.warn(
-      `\n[vite] ${colors.yellow("Warning")}: Unable to find TLS certificate files for host "${resolvedHost}".\n\n` +
+      `
+[nb-vite] ${colors.yellow("Warning")}: Unable to find TLS certificate files for host "${resolvedHost}".\n\n` +
         `Searched in the following locations:\n` +
         uniquePaths.map((p) => `  - ${p}`).join("\n") +
         "\n\n" +

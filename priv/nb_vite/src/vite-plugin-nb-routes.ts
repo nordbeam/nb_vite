@@ -46,6 +46,12 @@ export interface NbRoutesPluginOptions {
    * @default 'mix nb_routes.gen'
    */
   command?: string;
+
+  /**
+   * Working directory for the command execution
+   * @default process.cwd()
+   */
+  cwd?: string;
 }
 
 /**
@@ -87,7 +93,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
   function regenerateRoutes() {
     if (isRegenerating) {
       if (opts.verbose) {
-        console.log('[nb-routes] Regeneration already in progress, skipping...');
+        console.log('[nb-vite:routes] Regeneration already in progress, skipping...');
       }
       return;
     }
@@ -95,21 +101,24 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
     isRegenerating = true;
 
     if (opts.verbose) {
-      console.log('[nb-routes] Regenerating routes...');
+      console.log('[nb-vite:routes] Regenerating routes...');
     }
 
     const [cmd, ...args] = opts.command.split(' ');
-    const child: ChildProcess = spawn(cmd, args, {
+    const spawnOptions: import('child_process').SpawnOptions = {
       stdio: 'inherit',
-      shell: true
-    });
+      cwd: opts.cwd || process.cwd(),
+      shell: process.platform === 'win32' // Only use shell on Windows for .bat/.cmd files
+    };
+
+    const child: ChildProcess = spawn(cmd, args, spawnOptions);
 
     child.on('close', (code) => {
       isRegenerating = false;
 
       if (code === 0) {
         if (opts.verbose) {
-          console.log('[nb-routes] Routes regenerated successfully');
+          console.log('[nb-vite:routes] Routes regenerated successfully');
         }
 
         // Invalidate the routes module for HMR
@@ -117,13 +126,13 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
           invalidateRoutesModule(server, opts.routesFile);
         }
       } else {
-        console.error('[nb-routes] Route generation failed with code', code);
+        console.error('[nb-vite:routes] Route generation failed with code', code);
       }
     });
 
     child.on('error', (err) => {
       isRegenerating = false;
-      console.error('[nb-routes] Error executing route generation:', err);
+      console.error('[nb-vite:routes] Error executing route generation:', err);
     });
   }
 
@@ -157,7 +166,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
       const module = server.moduleGraph.getModuleById(modulePath);
       if (module) {
         if (opts.verbose) {
-          console.log(`[nb-routes] Invalidating module: ${modulePath}`);
+          console.log(`[nb-vite:routes] Invalidating module: ${modulePath}`);
         }
         server.moduleGraph.invalidateModule(module);
         server.ws.send({
@@ -169,7 +178,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
     }
 
     if (opts.verbose) {
-      console.log(`[nb-routes] Module not found in graph, triggering full reload`);
+      console.log(`[nb-vite:routes] Module not found in graph, triggering full reload`);
     }
 
     // If module not found, trigger a full reload anyway
@@ -207,8 +216,8 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
       server = devServer;
 
       if (opts.verbose) {
-        console.log('[nb-routes] Plugin enabled');
-        console.log(`[nb-routes] Watching patterns:`, opts.routerPath);
+        console.log('[nb-vite:routes] Plugin enabled');
+        console.log(`[nb-vite:routes] Watching patterns:`, opts.routerPath);
       }
 
       // Watch for router file changes using Vite's built-in watcher
@@ -217,7 +226,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
 
         if (matchesRouterPattern(relativePath)) {
           if (opts.verbose) {
-            console.log(`[nb-routes] Detected change: ${relativePath}`);
+            console.log(`[nb-vite:routes] Detected change: ${relativePath}`);
           }
           debouncedRegenerate();
         }
@@ -238,7 +247,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
 
       // Generate routes once at build start
       if (opts.verbose) {
-        console.log('[nb-routes] Generating routes for build...');
+        console.log('[nb-vite:routes] Generating routes for build...');
       }
 
       regenerateRoutes();
