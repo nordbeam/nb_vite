@@ -79,6 +79,7 @@ export function componentPath(options: ComponentPathPluginOptions = {}): Plugin 
 
   return {
     name: 'nb-component-path',
+    enforce: 'pre', // Run before other plugins (especially React)
 
     configResolved(config) {
       isDev = config.mode === 'development';
