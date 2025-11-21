@@ -25,11 +25,7 @@ export default [
       "path",
       "net",
       "http",
-      "child_process",
-      "@babel/parser",
-      "@babel/traverse",
-      "@babel/generator",
-      "@babel/types"
+      "child_process"
     ],
     plugins: [
       resolve({
@@ -64,37 +60,6 @@ export default [
         preferBuiltins: true,
         browser: false,
       }),
-      commonjs(),
-      typescript({
-        tsconfig: "./tsconfig.json",
-      }),
-    ],
-  },
-  // component-path plugin
-  {
-    input: "src/vite-plugin-component-path.ts",
-    output: {
-      file: "dist/vite-plugin-component-path.js",
-      format: "esm",
-      inlineDynamicImports: true,
-    },
-    external: [
-      "vite",
-      "node:fs",
-      "node:path",
-      "fs",
-      "path",
-      "@babel/parser",
-      "@babel/traverse",
-      "@babel/generator",
-      "@babel/types"
-    ],
-    plugins: [
-      resolve({
-        preferBuiltins: true,
-        browser: false,
-      }),
-      json(),
       commonjs(),
       typescript({
         tsconfig: "./tsconfig.json",
