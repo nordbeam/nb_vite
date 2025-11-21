@@ -201,7 +201,7 @@ if Code.ensure_loaded?(Igniter) do
 
       """
       import { defineConfig } from 'vite'
-      import { phoenix } from 'nb_vite'#{path_import}#{imports}
+      import phoenix from '@nordbeam/nb-vite'#{path_import}#{imports}
 
       export default defineConfig({
         plugins: [#{plugins}
@@ -233,7 +233,7 @@ if Code.ensure_loaded?(Igniter) do
 
       """
       import { defineConfig } from 'vite'
-      import { phoenix } from 'nb_vite'#{path_import}#{imports}
+      import phoenix from '@nordbeam/nb-vite'#{path_import}#{imports}
       import nodePrefixPlugin from './vite-plugins/node-prefix-plugin.js'
 
       export default defineConfig(({ command, mode, isSsrBuild }) => {
@@ -454,8 +454,6 @@ if Code.ensure_loaded?(Igniter) do
 
     defp build_dependencies(features) do
       deps = %{
-        "vite" => "^7.0.0",
-        "nb_vite" => "workspace:*",
         "phoenix" => "workspace:*",
         "phoenix_html" => "workspace:*",
         "phoenix_live_view" => "workspace:*"
@@ -487,7 +485,11 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp build_dev_dependencies(features) do
-      dev_deps = %{"@types/phoenix" => "^1.6.0"}
+      dev_deps = %{
+        "vite" => "^7.0.0",
+        "@nordbeam/nb-vite" => "^0.2.0",
+        "@types/phoenix" => "^1.6.0"
+      }
 
       dev_deps =
         if features.typescript do

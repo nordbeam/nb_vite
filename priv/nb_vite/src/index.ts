@@ -1848,4 +1848,8 @@ function resolvePhoenixJSAliases(): Record<string, string> {
   return aliases;
 }
 
+// Re-export additional plugins
+export { componentPath } from './vite-plugin-component-path';
+export { nbRoutes } from './vite-plugin-nb-routes';
+
 export { phoenix };

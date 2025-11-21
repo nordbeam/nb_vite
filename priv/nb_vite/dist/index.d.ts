@@ -104,4 +104,6 @@ interface RefreshConfig {
 }
 export declare const refreshPaths: string[];
 export default function phoenix(config: string | string[] | PluginConfig): PluginOption[];
+export { componentPath } from './vite-plugin-component-path';
+export { nbRoutes } from './vite-plugin-nb-routes';
 export { phoenix };

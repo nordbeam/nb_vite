@@ -1,0 +1,21 @@
+# Development files
+node_modules/
+.DS_Store
+*.log
+*.swp
+.vite/
+
+# Build artifacts
+*.tsbuildinfo
+
+# Documentation that's not needed in the package
+docs/
+example.env
+
+# Keep source and built files
+!src/
+!dist/
+!rollup.config.js
+!tsconfig.json
+!README.md
+!LICENSE

@@ -36,6 +36,38 @@ mix igniter.install nb_vite --react --typescript
 <%= NbVite.vite_assets("css/app.css") %>
 ```
 
+## NPM Package
+
+The Vite plugin is available as an npm package for easier dependency management:
+
+```bash
+npm install @nordbeam/nb-vite --save-dev
+```
+
+**Benefits of using the npm package:**
+- Standard npm dependency management
+- Automatic updates via package managers
+- Better IDE integration and type checking
+- Smaller Phoenix application footprint
+
+**Usage:**
+
+```typescript
+// assets/vite.config.ts
+import { defineConfig } from 'vite';
+import phoenix from '@nordbeam/nb-vite';
+
+export default defineConfig({
+  plugins: [
+    phoenix({
+      input: ['js/app.ts']
+    })
+  ]
+});
+```
+
+**Legacy file reference:** The plugin is also bundled in `priv/static/nb_vite/` for projects that prefer file references, but the npm package is recommended for new projects.
+
 ## Vite Plugins
 
 NbVite includes specialized Vite plugins for enhanced Phoenix integration.

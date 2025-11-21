@@ -1,8 +1,14 @@
 import fs from 'node:fs';
-import path from 'node:path';
+import path$1 from 'node:path';
 import os from 'node:os';
 import { normalizePath, loadEnv } from 'vite';
-import require$$0, { resolve, relative } from 'path';
+import * as path from 'path';
+import path__default, { resolve, relative } from 'path';
+import { parse } from '@babel/parser';
+import traverseDefault from '@babel/traverse';
+import generateDefault from '@babel/generator';
+import * as t from '@babel/types';
+import { spawn } from 'child_process';
 
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -105,7 +111,7 @@ function requireConstants () {
 	if (hasRequiredConstants) return constants;
 	hasRequiredConstants = 1;
 
-	const path = require$$0;
+	const path = path__default;
 	const WIN_SLASH = '\\\\/';
 	const WIN_NO_SLASH = `[^${WIN_SLASH}]`;
 
@@ -292,7 +298,7 @@ function requireUtils () {
 	hasRequiredUtils = 1;
 	(function (exports$1) {
 
-		const path = require$$0;
+		const path = path__default;
 		const win32 = process.platform === 'win32';
 		const {
 		  REGEX_BACKSLASH,
@@ -1863,7 +1869,7 @@ function requirePicomatch$1 () {
 	if (hasRequiredPicomatch$1) return picomatch_1;
 	hasRequiredPicomatch$1 = 1;
 
-	const path = require$$0;
+	const path = path__default;
 	const scan = requireScan();
 	const parse = requireParse();
 	const utils = requireUtils();
@@ -2246,6 +2252,444 @@ var src_default = (paths, config = {}) => ({
   }
 });
 
+/**
+ * Vite plugin for adding data-nb-component attribute to all React/Vue components
+ *
+ * This plugin transforms component files to add a data-nb-component attribute
+ * to the root element, showing the source file path for easier debugging.
+ *
+ * Example output:
+ *   <div data-nb-component="assets/js/pages/Users/Show.tsx">...</div>
+ */
+// Handle both ESM and CommonJS imports
+const traverse = traverseDefault.default || traverseDefault;
+const generate = generateDefault.default || generateDefault;
+/**
+ * Creates a Vite plugin that adds data-nb-component to all components
+ *
+ * @example
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import { componentPath } from '@nordbeam/nb-vite/component-path';
+ *
+ * export default defineConfig({
+ *   plugins: [
+ *     componentPath({
+ *       enabled: true
+ *     })
+ *   ]
+ * });
+ * ```
+ */
+function componentPath(options = {}) {
+    const opts = {
+        enabled: true,
+        includeExtension: true,
+        verbose: false,
+        ...options
+    };
+    let isDev = false;
+    let projectRoot = process.cwd();
+    return {
+        name: 'nb-component-path',
+        configResolved(config) {
+            isDev = config.mode === 'development';
+            if (opts.verbose) {
+                console.log('[nb-vite:component-path] Plugin initialized');
+                console.log(`[nb-vite:component-path] Mode: ${config.mode}`);
+                if (options.enabled === true) {
+                    console.log(`[nb-vite:component-path] Enabled: true (forced for all modes)`);
+                }
+                else if (isDev) {
+                    console.log(`[nb-vite:component-path] Enabled: true (development mode)`);
+                }
+                else {
+                    console.log(`[nb-vite:component-path] Enabled: false (production mode, use enabled: true to force)`);
+                }
+            }
+        },
+        transform(code, id) {
+            // Only run if enabled AND (in dev mode OR explicitly enabled for all modes)
+            // Default behavior: only dev mode
+            // To enable in production: pass enabled: true explicitly
+            if (!opts.enabled) {
+                return null;
+            }
+            if (!isDev && options.enabled === undefined) {
+                // Not in dev, and user didn't explicitly enable it - skip
+                return null;
+            }
+            // Only transform React/Vue component files
+            if (!isComponentFile(id)) {
+                return null;
+            }
+            // Get relative path from project root
+            const relativePath = path.relative(projectRoot, id);
+            // Build the component path attribute value
+            const componentPath = opts.includeExtension
+                ? relativePath
+                : relativePath.replace(/\.(tsx?|jsx?|vue)$/, '');
+            if (opts.verbose) {
+                console.log(`[nb-vite:component-path] Transforming: ${componentPath}`);
+            }
+            // Transform based on file type
+            if (id.endsWith('.vue')) {
+                return transformVueComponent(code, componentPath);
+            }
+            else {
+                return transformReactComponent(code, componentPath, id);
+            }
+        }
+    };
+}
+/**
+ * Check if file is a component file that should be transformed
+ */
+function isComponentFile(id) {
+    // Skip node_modules
+    if (id.includes('node_modules')) {
+        return false;
+    }
+    // Only process React and Vue component files
+    const ext = path.extname(id);
+    return ['.tsx', '.jsx', '.vue'].includes(ext);
+}
+/**
+ * Transform React component to add data-nb-component attribute using Babel
+ */
+function transformReactComponent(code, componentPath, id) {
+    try {
+        // Parse the code into an AST
+        const ast = parse(code, {
+            sourceType: 'module',
+            plugins: ['jsx', 'typescript'],
+            sourceFilename: id
+        });
+        let hasModifications = false;
+        const attributeValue = componentPath.replace(/\\/g, '/');
+        // Traverse the AST and find JSX elements to modify
+        traverse(ast, {
+            // Look for default export
+            ExportDefaultDeclaration(path) {
+                const declaration = path.node.declaration;
+                // Handle: export default function Component() { return <div>...</div> }
+                if (t.isFunctionDeclaration(declaration)) {
+                    transformFunctionBody(declaration, attributeValue);
+                    hasModifications = true;
+                }
+                // Handle: export default () => <div>...</div> (inline arrow function)
+                else if (t.isArrowFunctionExpression(declaration)) {
+                    // Check if it directly returns JSX
+                    if (t.isJSXElement(declaration.body)) {
+                        addAttributeToJSXElement(declaration.body, attributeValue);
+                        hasModifications = true;
+                    }
+                    else {
+                        transformFunctionBody(declaration, attributeValue);
+                        hasModifications = true;
+                    }
+                }
+                // Handle: export default Component;
+                else if (t.isIdentifier(declaration)) {
+                    // Find the identifier's definition and transform it
+                    const binding = path.scope.getBinding(declaration.name);
+                    if (binding && binding.path.isVariableDeclarator()) {
+                        const init = binding.path.node.init;
+                        if (t.isFunctionExpression(init) || t.isArrowFunctionExpression(init)) {
+                            transformFunctionBody(init, attributeValue);
+                            hasModifications = true;
+                        }
+                    }
+                }
+            },
+            // Also handle: const Component = () => {}; export default Component;
+            VariableDeclarator(path) {
+                const init = path.node.init;
+                if (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init)) {
+                    // Check if this is eventually exported
+                    if (t.isIdentifier(path.node.id)) {
+                        const binding = path.scope.getBinding(path.node.id.name);
+                        if (binding && binding.referencePaths.some((ref) => {
+                            return ref.findParent((p) => p.isExportDefaultDeclaration());
+                        })) {
+                            transformFunctionBody(init, attributeValue);
+                            hasModifications = true;
+                        }
+                    }
+                }
+            }
+        });
+        if (!hasModifications) {
+            return null;
+        }
+        // Generate code from modified AST
+        const output = generate(ast, {
+            sourceMaps: true,
+            sourceFileName: id
+        }, code);
+        return {
+            code: output.code,
+            map: output.map
+        };
+    }
+    catch (error) {
+        // If transformation fails, return original code
+        console.error(`[nb-vite:component-path] Failed to transform ${id}:`, error);
+        return null;
+    }
+}
+/**
+ * Transform a function body to add data-nb-component to the first JSX element
+ */
+function transformFunctionBody(func, componentPath) {
+    // @ts-ignore - traverse signature mismatch
+    traverse(func, {
+        ReturnStatement(path) {
+            const argument = path.node.argument;
+            if (t.isJSXElement(argument)) {
+                addAttributeToJSXElement(argument, componentPath);
+                path.stop();
+            }
+            else if (t.isJSXFragment(argument)) {
+                // Can't add attributes to fragments, skip
+                path.stop();
+            }
+        },
+        // Handle cases where JSX is directly returned (arrow functions)
+        ArrowFunctionExpression(path) {
+            if (t.isJSXElement(path.node.body)) {
+                addAttributeToJSXElement(path.node.body, componentPath);
+                path.stop();
+            }
+        }
+    }, func);
+}
+/**
+ * Add data-nb-component attribute to a JSX element
+ */
+function addAttributeToJSXElement(element, componentPath) {
+    const openingElement = element.openingElement;
+    // Check if attribute already exists
+    const hasAttribute = openingElement.attributes.some(attr => t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'data-nb-component');
+    if (hasAttribute) {
+        return;
+    }
+    // Create the new attribute
+    const attribute = t.jsxAttribute(t.jsxIdentifier('data-nb-component'), t.stringLiteral(componentPath));
+    // Add attribute to the beginning of the attributes list
+    openingElement.attributes.unshift(attribute);
+}
+/**
+ * Transform Vue component to add data-nb-component attribute
+ */
+function transformVueComponent(code, componentPath) {
+    const attributeValue = componentPath.replace(/\\/g, '/').replace(/"/g, '&quot;');
+    // Find the template section
+    const templateMatch = code.match(/<template>([\s\S]*?)<\/template>/);
+    if (!templateMatch) {
+        return null;
+    }
+    const templateContent = templateMatch[1];
+    const trimmed = templateContent.trim();
+    // Find the root element in the template
+    const rootElementMatch = trimmed.match(/^<(\w+)([^>]*)>/);
+    if (!rootElementMatch) {
+        return null;
+    }
+    const [fullMatch, tagName, attributes] = rootElementMatch;
+    // Check if data-nb-component already exists
+    if (attributes.includes('data-nb-component')) {
+        return null;
+    }
+    // Add the attribute to the root element
+    const newRootElement = `<${tagName}${attributes} data-nb-component="${attributeValue}">`;
+    const newTemplateContent = trimmed.replace(fullMatch, newRootElement);
+    const newCode = code.replace(/<template>[\s\S]*?<\/template>/, `<template>\n${newTemplateContent}\n</template>`);
+    return {
+        code: newCode,
+        map: null
+    };
+}
+
+/**
+ * Vite plugin for auto-regenerating nb_routes when router.ex changes
+ *
+ * This plugin watches Phoenix router files and automatically regenerates
+ * JavaScript/TypeScript route helpers when changes are detected.
+ */
+/**
+ * Creates a Vite plugin for nb_routes auto-regeneration
+ *
+ * @example
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import { nbRoutes } from '@nordbeam/nb-vite/nb-routes';
+ *
+ * export default defineConfig({
+ *   plugins: [
+ *     nbRoutes({
+ *       enabled: true,
+ *       verbose: true
+ *     })
+ *   ]
+ * });
+ * ```
+ */
+function nbRoutes(options = {}) {
+    const opts = {
+        enabled: true,
+        routerPath: ['lib/**/*_web/router.ex', 'lib/**/router.ex'],
+        debounce: 300,
+        verbose: false,
+        routesFile: 'assets/js/routes.js',
+        command: 'mix nb_routes.gen',
+        ...options
+    };
+    let server = null;
+    let isRegenerating = false;
+    let debounceTimer = null;
+    /**
+     * Trigger route regeneration
+     */
+    function regenerateRoutes() {
+        if (isRegenerating) {
+            if (opts.verbose) {
+                console.log('[nb-vite:routes] Regeneration already in progress, skipping...');
+            }
+            return;
+        }
+        isRegenerating = true;
+        if (opts.verbose) {
+            console.log('[nb-vite:routes] Regenerating routes...');
+        }
+        const [cmd, ...args] = opts.command.split(' ');
+        const spawnOptions = {
+            stdio: 'inherit',
+            cwd: opts.cwd || process.cwd(),
+            shell: process.platform === 'win32' // Only use shell on Windows for .bat/.cmd files
+        };
+        const child = spawn(cmd, args, spawnOptions);
+        child.on('close', (code) => {
+            isRegenerating = false;
+            if (code === 0) {
+                if (opts.verbose) {
+                    console.log('[nb-vite:routes] Routes regenerated successfully');
+                }
+                // Invalidate the routes module for HMR
+                if (server) {
+                    invalidateRoutesModule(server, opts.routesFile);
+                }
+            }
+            else {
+                console.error('[nb-vite:routes] Route generation failed with code', code);
+            }
+        });
+        child.on('error', (err) => {
+            isRegenerating = false;
+            console.error('[nb-vite:routes] Error executing route generation:', err);
+        });
+    }
+    /**
+     * Debounced route regeneration
+     */
+    function debouncedRegenerate() {
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(() => {
+            regenerateRoutes();
+            debounceTimer = null;
+        }, opts.debounce);
+    }
+    /**
+     * Invalidate the routes module in Vite's module graph
+     */
+    function invalidateRoutesModule(server, routesFile) {
+        // Try multiple possible paths for the routes file
+        const possiblePaths = [
+            `/${routesFile}`,
+            `/${routesFile.replace(/^assets\//, '')}`,
+            path.resolve(routesFile),
+            path.resolve('assets', path.basename(routesFile))
+        ];
+        for (const modulePath of possiblePaths) {
+            const module = server.moduleGraph.getModuleById(modulePath);
+            if (module) {
+                if (opts.verbose) {
+                    console.log(`[nb-vite:routes] Invalidating module: ${modulePath}`);
+                }
+                server.moduleGraph.invalidateModule(module);
+                server.ws.send({
+                    type: 'full-reload',
+                    path: '*'
+                });
+                return;
+            }
+        }
+        if (opts.verbose) {
+            console.log(`[nb-vite:routes] Module not found in graph, triggering full reload`);
+        }
+        // If module not found, trigger a full reload anyway
+        server.ws.send({
+            type: 'full-reload',
+            path: '*'
+        });
+    }
+    /**
+     * Check if a file matches the router pattern
+     */
+    function matchesRouterPattern(filePath) {
+        const patterns = Array.isArray(opts.routerPath) ? opts.routerPath : [opts.routerPath];
+        return patterns.some(pattern => {
+            // Simple glob matching - supports ** and *
+            const regex = pattern
+                .replace(/\./g, '\\.')
+                .replace(/\*\*/g, '.*')
+                .replace(/\*/g, '[^/]*');
+            return new RegExp(`^${regex}$`).test(filePath);
+        });
+    }
+    return {
+        name: 'nb-routes',
+        configureServer(devServer) {
+            if (!opts.enabled) {
+                return;
+            }
+            server = devServer;
+            if (opts.verbose) {
+                console.log('[nb-vite:routes] Plugin enabled');
+                console.log(`[nb-vite:routes] Watching patterns:`, opts.routerPath);
+            }
+            // Watch for router file changes using Vite's built-in watcher
+            devServer.watcher.on('change', (filePath) => {
+                const relativePath = path.relative(process.cwd(), filePath);
+                if (matchesRouterPattern(relativePath)) {
+                    if (opts.verbose) {
+                        console.log(`[nb-vite:routes] Detected change: ${relativePath}`);
+                    }
+                    debouncedRegenerate();
+                }
+            });
+            // Cleanup on server close
+            devServer.httpServer?.once('close', () => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+            });
+        },
+        buildStart() {
+            if (!opts.enabled) {
+                return;
+            }
+            // Generate routes once at build start
+            if (opts.verbose) {
+                console.log('[nb-vite:routes] Generating routes for build...');
+            }
+            regenerateRoutes();
+        }
+    };
+}
+
 let exitHandlersBound = false;
 const refreshPaths = [
     "lib/**/*.ex",
@@ -2277,7 +2721,7 @@ function resolvePluginConfig(config) {
     }
     // Validate input paths exist
     const validateInputPath = (inputPath) => {
-        const resolvedPath = path.resolve(process.cwd(), inputPath);
+        const resolvedPath = path$1.resolve(process.cwd(), inputPath);
         if (!fs.existsSync(resolvedPath)) {
             console.warn(`[nb-vite] ${colors.yellow("Warning")}: Input file "${inputPath}" does not exist. Make sure to create it before running Vite.`);
         }
@@ -2298,7 +2742,7 @@ function resolvePluginConfig(config) {
             throw new Error("phoenix-vite-plugin: publicDirectory must be a subdirectory. E.g. 'priv/static'. Got empty string after normalization.");
         }
         // Validate public directory exists
-        const publicDirPath = path.resolve(process.cwd(), config.publicDirectory);
+        const publicDirPath = path$1.resolve(process.cwd(), config.publicDirectory);
         if (!fs.existsSync(publicDirPath)) {
             console.warn(`[nb-vite] ${colors.yellow("Warning")}: Public directory "${config.publicDirectory}" does not exist. It will be created during build.`);
         }
@@ -2331,10 +2775,10 @@ function resolvePluginConfig(config) {
         config.ssrOutputDirectory = "priv/ssr";
     }
     if (config.hotFile === undefined) {
-        config.hotFile = path.join("priv", "hot");
+        config.hotFile = path$1.join("priv", "hot");
     }
     if (config.manifestPath === undefined) {
-        config.manifestPath = path.join(config.publicDirectory, config.buildDirectory, "manifest.json");
+        config.manifestPath = path$1.join(config.publicDirectory, config.buildDirectory, "manifest.json");
     }
     if (config.ssr === undefined) {
         config.ssr = config.input;
@@ -2373,7 +2817,7 @@ function resolvePluginConfig(config) {
             ssrDev.entryPoint = './js/ssr_dev.tsx';
         }
         if (ssrDev.hotFile === undefined) {
-            ssrDev.hotFile = path.join('priv', 'ssr-hot');
+            ssrDev.hotFile = path$1.join('priv', 'ssr-hot');
         }
         config.ssrDev = ssrDev;
     }
@@ -2415,7 +2859,7 @@ async function setupSSREndpoint(viteServer, ssrConfig) {
     let cachedRender = null;
     // Watch for file changes and invalidate cache
     viteServer.watcher.on('change', async (file) => {
-        const jsDir = path.resolve(viteServer.config.root, "./js");
+        const jsDir = path$1.resolve(viteServer.config.root, "./js");
         if (!file.startsWith(jsDir) || !file.match(/\.(tsx?|jsx?)$/)) {
             return;
         }
@@ -2441,7 +2885,7 @@ async function setupSSREndpoint(viteServer, ssrConfig) {
     // Load the render function
     async function loadRenderFunction() {
         if (!cachedRender) {
-            const ssrEntryPath = path.resolve(viteServer.config.root, ssrConfig.entryPoint);
+            const ssrEntryPath = path$1.resolve(viteServer.config.root, ssrConfig.entryPoint);
             console.log(`[nb-vite:ssr] Loading SSR entry: ${ssrEntryPath}`);
             // Invalidate module graph for fresh reload
             const mods = await viteServer.moduleGraph.getModulesByFile(ssrEntryPath);
@@ -2563,7 +3007,7 @@ function resolvePhoenixPlugin(pluginConfig) {
     let resolvedConfig;
     let userConfig;
     const defaultAliases = {
-        "@": path.resolve(process.cwd(), "assets/js"),
+        "@": path$1.resolve(process.cwd(), "assets/js"),
     };
     // Resolve Phoenix JS library aliases
     const phoenixAliases = resolvePhoenixJSAliases();
@@ -2720,7 +3164,7 @@ function resolvePhoenixPlugin(pluginConfig) {
                     // Write hot file with error handling
                     try {
                         const hotContent = `${viteDevServerUrl}${server.config.base.replace(/\/$/, "")}`;
-                        const hotDir = path.dirname(pluginConfig.hotFile);
+                        const hotDir = path$1.dirname(pluginConfig.hotFile);
                         if (!fs.existsSync(hotDir)) {
                             fs.mkdirSync(hotDir, { recursive: true });
                         }
@@ -2732,7 +3176,7 @@ function resolvePhoenixPlugin(pluginConfig) {
                         if (typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.enabled && pluginConfig.ssrDev.hotFile) {
                             try {
                                 const ssrUrl = `${viteDevServerUrl}${server.config.base.replace(/\/$/, "")}${pluginConfig.ssrDev.path}`;
-                                const ssrHotDir = path.dirname(pluginConfig.ssrDev.hotFile);
+                                const ssrHotDir = path$1.dirname(pluginConfig.ssrDev.hotFile);
                                 if (!fs.existsSync(ssrHotDir)) {
                                     fs.mkdirSync(ssrHotDir, { recursive: true });
                                 }
@@ -2863,7 +3307,7 @@ function resolvePhoenixPlugin(pluginConfig) {
             if (!resolvedConfig.build.ssr) {
                 try {
                     // Read Vite's generated manifest
-                    const viteManifestPath = path.join(resolvedConfig.build.outDir, ".vite", "manifest.json");
+                    const viteManifestPath = path$1.join(resolvedConfig.build.outDir, ".vite", "manifest.json");
                     if (!fs.existsSync(viteManifestPath)) {
                         console.warn(`
 [nb-vite] ${colors.yellow("Warning")}: Vite manifest not found at ${viteManifestPath}\n`);
@@ -2889,7 +3333,7 @@ function resolvePhoenixPlugin(pluginConfig) {
                         manifest[key] = transformedEntry;
                     }
                     const manifestContent = JSON.stringify(manifest, null, 2);
-                    const manifestDir = path.dirname(pluginConfig.manifestPath);
+                    const manifestDir = path$1.dirname(pluginConfig.manifestPath);
                     // Ensure manifest directory exists
                     if (!fs.existsSync(manifestDir)) {
                         if (process.env.DEBUG || process.env.VERBOSE) {
@@ -2941,7 +3385,7 @@ function checkCommonConfigurationIssues(pluginConfig, env, userConfig) {
             `You may need to set server.host to '0.0.0.0' in your vite.config.js for proper access from Windows.\n`);
     }
     // Check for missing Phoenix dependencies
-    const depsPath = path.resolve(process.cwd(), "../deps");
+    const depsPath = path$1.resolve(process.cwd(), "../deps");
     if (!fs.existsSync(depsPath)) {
         console.warn(`
 [nb-vite] ${colors.yellow("Warning")}: Phoenix deps directory not found at ${depsPath}.\n` +
@@ -2949,7 +3393,7 @@ function checkCommonConfigurationIssues(pluginConfig, env, userConfig) {
             `If you're building in Docker, ensure the deps are available at build time.\n`);
     }
     // Check for critical node_modules that might cause config loading to fail
-    const nodeModulesPath = path.resolve(process.cwd(), "node_modules");
+    const nodeModulesPath = path$1.resolve(process.cwd(), "node_modules");
     if (!fs.existsSync(nodeModulesPath)) {
         console.error(`
 [nb-vite] ${colors.red("Error")}: node_modules directory not found.\n` +
@@ -2958,7 +3402,7 @@ function checkCommonConfigurationIssues(pluginConfig, env, userConfig) {
     }
     else {
         // Check for critical Vite dependency
-        const vitePath = path.resolve(nodeModulesPath, "vite");
+        const vitePath = path$1.resolve(nodeModulesPath, "vite");
         if (!fs.existsSync(vitePath)) {
             console.error(`
 [nb-vite] ${colors.red("Error")}: Vite is not installed in node_modules.\n` +
@@ -2967,7 +3411,7 @@ function checkCommonConfigurationIssues(pluginConfig, env, userConfig) {
         }
     }
     // Warn if hot file directory doesn't exist
-    const hotFileDir = path.dirname(pluginConfig.hotFile);
+    const hotFileDir = path$1.dirname(pluginConfig.hotFile);
     if (!fs.existsSync(hotFileDir)) {
         console.warn(`
 [nb-vite] ${colors.yellow("Warning")}: Hot file directory "${hotFileDir}" does not exist.\n` +
@@ -3052,9 +3496,9 @@ function phoenixVersion() {
     try {
         // Try to find mix.exs in common locations
         const possiblePaths = [
-            path.join(process.cwd(), "mix.exs"),
-            path.join(process.cwd(), "../mix.exs"),
-            path.join(process.cwd(), "../../mix.exs"),
+            path$1.join(process.cwd(), "mix.exs"),
+            path$1.join(process.cwd(), "../mix.exs"),
+            path$1.join(process.cwd(), "../../mix.exs"),
         ];
         for (const mixExsPath of possiblePaths) {
             if (fs.existsSync(mixExsPath)) {
@@ -3084,12 +3528,12 @@ function phoenixVersion() {
  */
 function pluginVersion() {
     try {
-        const currentDir = path.dirname(new URL(import.meta.url).pathname);
+        const currentDir = path$1.dirname(new URL(import.meta.url).pathname);
         // Try different paths to find package.json
         const possiblePaths = [
-            path.join(currentDir, "package.json"), // When running from priv/static/nb_vite/ (distributed)
-            path.join(currentDir, "../package.json"), // When running from dist/ (during build)
-            path.join(currentDir, "../../package.json"), // When running from src/ (development)
+            path$1.join(currentDir, "package.json"), // When running from priv/static/nb_vite/ (distributed)
+            path$1.join(currentDir, "../package.json"), // When running from dist/ (during build)
+            path$1.join(currentDir, "../../package.json"), // When running from src/ (development)
         ];
         for (const packageJsonPath of possiblePaths) {
             if (fs.existsSync(packageJsonPath)) {
@@ -3232,10 +3676,10 @@ function resolveInput(config, ssr) {
     }
     // Convert string arrays to proper rollup input format
     if (Array.isArray(config.input)) {
-        return config.input.map((entry) => path.resolve(process.cwd(), entry));
+        return config.input.map((entry) => path$1.resolve(process.cwd(), entry));
     }
     if (typeof config.input === "string") {
-        return path.resolve(process.cwd(), config.input);
+        return path$1.resolve(process.cwd(), config.input);
     }
     return config.input;
 }
@@ -3246,7 +3690,7 @@ function resolveOutDir(config, ssr) {
     if (ssr) {
         return config.ssrOutputDirectory;
     }
-    return path.join(config.publicDirectory, config.buildDirectory);
+    return path$1.join(config.publicDirectory, config.buildDirectory);
 }
 /**
  * Add the Inertia helpers to the list of SSR dependencies that aren't externalized.
@@ -3291,47 +3735,47 @@ function resolveDevelopmentEnvironmentServerConfig(detectTls, env) {
     const possibleCertPaths = [
         // mkcert default location (cross-platform)
         {
-            key: path.join(homeDir, ".local/share/mkcert", `${resolvedHost}-key.pem`),
-            cert: path.join(homeDir, ".local/share/mkcert", `${resolvedHost}.pem`),
+            key: path$1.join(homeDir, ".local/share/mkcert", `${resolvedHost}-key.pem`),
+            cert: path$1.join(homeDir, ".local/share/mkcert", `${resolvedHost}.pem`),
             name: "mkcert",
         },
         // mkcert on macOS
         {
-            key: path.join(homeDir, "Library/Application Support/mkcert", `${resolvedHost}-key.pem`),
-            cert: path.join(homeDir, "Library/Application Support/mkcert", `${resolvedHost}.pem`),
+            key: path$1.join(homeDir, "Library/Application Support/mkcert", `${resolvedHost}-key.pem`),
+            cert: path$1.join(homeDir, "Library/Application Support/mkcert", `${resolvedHost}.pem`),
             name: "mkcert (macOS)",
         },
         // Caddy certificates location
         {
-            key: path.join(homeDir, ".local/share/caddy/certificates/local", `${resolvedHost}`, `${resolvedHost}.key`),
-            cert: path.join(homeDir, ".local/share/caddy/certificates/local", `${resolvedHost}`, `${resolvedHost}.crt`),
+            key: path$1.join(homeDir, ".local/share/caddy/certificates/local", `${resolvedHost}`, `${resolvedHost}.key`),
+            cert: path$1.join(homeDir, ".local/share/caddy/certificates/local", `${resolvedHost}`, `${resolvedHost}.crt`),
             name: "Caddy",
         },
         // Generic location in project
         {
-            key: path.join(process.cwd(), "priv/cert", `${resolvedHost}-key.pem`),
-            cert: path.join(process.cwd(), "priv/cert", `${resolvedHost}.pem`),
+            key: path$1.join(process.cwd(), "priv/cert", `${resolvedHost}-key.pem`),
+            cert: path$1.join(process.cwd(), "priv/cert", `${resolvedHost}.pem`),
             name: "project (priv/cert)",
         },
         {
-            key: path.join(process.cwd(), "priv/cert", `${resolvedHost}.key`),
-            cert: path.join(process.cwd(), "priv/cert", `${resolvedHost}.crt`),
+            key: path$1.join(process.cwd(), "priv/cert", `${resolvedHost}.key`),
+            cert: path$1.join(process.cwd(), "priv/cert", `${resolvedHost}.crt`),
             name: "project (priv/cert)",
         },
         // Additional common project locations
         {
-            key: path.join(process.cwd(), "certs", `${resolvedHost}-key.pem`),
-            cert: path.join(process.cwd(), "certs", `${resolvedHost}.pem`),
+            key: path$1.join(process.cwd(), "certs", `${resolvedHost}-key.pem`),
+            cert: path$1.join(process.cwd(), "certs", `${resolvedHost}.pem`),
             name: "project (certs/)",
         },
         {
-            key: path.join(process.cwd(), "certs", `${resolvedHost}.key`),
-            cert: path.join(process.cwd(), "certs", `${resolvedHost}.crt`),
+            key: path$1.join(process.cwd(), "certs", `${resolvedHost}.key`),
+            cert: path$1.join(process.cwd(), "certs", `${resolvedHost}.crt`),
             name: "project (certs/)",
         },
     ];
     for (const certPath of possibleCertPaths) {
-        searchPaths.push(`${certPath.name}: ${path.dirname(certPath.cert)}`);
+        searchPaths.push(`${certPath.name}: ${path$1.dirname(certPath.cert)}`);
         if (fs.existsSync(certPath.key) && fs.existsSync(certPath.cert)) {
             if (process.env.DEBUG || process.env.VERBOSE) {
                 console.log(colors.dim(`Found TLS certificates in ${certPath.name} location`));
@@ -3385,8 +3829,8 @@ function resolvePhoenixColocatedAliases() {
         return aliases;
     }
     // Build the colocated path
-    const buildPath = process.env.PHX_BUILD_PATH || path.resolve(process.cwd(), '../../_build/dev');
-    const colocatedPath = path.resolve(buildPath, `phoenix-colocated/${appName}`);
+    const buildPath = process.env.PHX_BUILD_PATH || path$1.resolve(process.cwd(), '../../_build/dev');
+    const colocatedPath = path$1.resolve(buildPath, `phoenix-colocated/${appName}`);
     // Add the alias
     aliases[`phoenix-colocated/${appName}`] = colocatedPath;
     if (process.env.DEBUG || process.env.VERBOSE) {
@@ -3421,7 +3865,7 @@ function isPhoenix18() {
  */
 function resolvePhoenixJSAliases() {
     const aliases = {};
-    const depsPath = path.resolve(process.cwd(), "../deps");
+    const depsPath = path$1.resolve(process.cwd(), "../deps");
     // Phoenix library configurations
     const phoenixLibraries = [
         {
@@ -3448,7 +3892,7 @@ function resolvePhoenixJSAliases() {
     // Check each library and use the first available version
     for (const library of phoenixLibraries) {
         for (const libPath of library.paths) {
-            const fullPath = path.join(depsPath, libPath);
+            const fullPath = path$1.join(depsPath, libPath);
             if (fs.existsSync(fullPath)) {
                 aliases[library.name] = fullPath;
                 if (process.env.DEBUG || process.env.VERBOSE) {
@@ -3472,4 +3916,4 @@ function resolvePhoenixJSAliases() {
     return aliases;
 }
 
-export { phoenix as default, phoenix, refreshPaths };
+export { componentPath, phoenix as default, nbRoutes, phoenix, refreshPaths };
