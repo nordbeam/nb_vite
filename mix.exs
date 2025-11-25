@@ -31,7 +31,7 @@ defmodule NbVite.MixProject do
       {:phoenix, "~> 1.7"},
       {:phoenix_html, "~> 3.3 or ~> 4.0"},
       {:jason, "~> 1.2"},
-      {:igniter, "~> 0.5", optional: true},
+      {:igniter, "~> 0.7", optional: true},
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       # Test dependencies
       {:phx_new, "~> 1.0", only: [:test]}
