@@ -15,16 +15,8 @@ Pure Phoenix + Vite integration for fast frontend builds.
 
 ## Installation
 
-```elixir
-def deps do
-  [
-    {:nb_vite, "~> 0.1"}
-  ]
-end
-```
-
 ```bash
-mix igniter.install nb_vite --react --typescript
+mix igniter.install nb_vite@github:nordbeam/nb_vite --react --typescript
 ```
 
 ## Usage
