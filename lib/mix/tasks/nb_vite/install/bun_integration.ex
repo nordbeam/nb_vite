@@ -92,46 +92,46 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
       :bun,
       [:dev],
       {:code,
-       quote do
-         [
-           args: ["run", "dev"],
-           cd: Path.expand("../assets", __DIR__),
-           env: %{
-             "PHX_BUILD_PATH" => Mix.Project.build_path(),
-             "PHX_APP_NAME" => unquote(app_name),
-             "PHX_VERSION" => unquote(phoenix_version)
-           }
-         ]
-       end}
+       Sourceror.parse_string!("""
+       [
+         args: ["run", "dev"],
+         cd: Path.expand("../assets", __DIR__),
+         env: %{
+           "PHX_BUILD_PATH" => Mix.Project.build_path(),
+           "PHX_APP_NAME" => "#{app_name}",
+           "PHX_VERSION" => "#{phoenix_version}"
+         }
+       ]
+       """)}
     )
     |> Igniter.Project.Config.configure(
       "config.exs",
       :bun,
       [:build],
       {:code,
-       quote do
-         [
-           args: ["run", "build"],
-           cd: Path.expand("../assets", __DIR__),
-           env: %{
-             "PHX_BUILD_PATH" => Mix.Project.build_path(),
-             "PHX_APP_NAME" => unquote(app_name),
-             "PHX_VERSION" => unquote(phoenix_version)
-           }
-         ]
-       end}
+       Sourceror.parse_string!("""
+       [
+         args: ["run", "build"],
+         cd: Path.expand("../assets", __DIR__),
+         env: %{
+           "PHX_BUILD_PATH" => Mix.Project.build_path(),
+           "PHX_APP_NAME" => "#{app_name}",
+           "PHX_VERSION" => "#{phoenix_version}"
+         }
+       ]
+       """)}
     )
     |> Igniter.Project.Config.configure(
       "config.exs",
       :bun,
       [:assets],
       {:code,
-       quote do
-         [
-           args: [],
-           cd: Path.expand("../assets", __DIR__)
-         ]
-       end}
+       Sourceror.parse_string!("""
+       [
+         args: [],
+         cd: Path.expand("../assets", __DIR__)
+       ]
+       """)}
     )
   end
 
@@ -164,11 +164,10 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
     {igniter, endpoint} = Igniter.Libs.Phoenix.select_endpoint(igniter)
     app_name = Igniter.Project.Application.app_name(igniter)
 
+    # Use Sourceror.parse_string! instead of quote do...end
+    # because rewrite 1.2.0 can't properly format AST from quote
     watcher_value =
-      {:code,
-       quote do
-         {Bun, :install_and_run, [:dev, []]}
-       end}
+      {:code, Sourceror.parse_string!("{Bun, :install_and_run, [:dev, []]}")}
 
     Igniter.Project.Config.configure(
       igniter,

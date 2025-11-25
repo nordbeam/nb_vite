@@ -739,9 +739,19 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp create_app_css(igniter) do
-      # Phoenix always generates app.css, so we don't need to create it
-      # Just return the igniter as-is
-      igniter
+      # Ensure css/app.css exists - Phoenix 1.8 may not create this file
+      css_path = "assets/css/app.css"
+
+      if Igniter.exists?(igniter, css_path) do
+        igniter
+      else
+        content = """
+        /* NB Vite - CSS Entry Point */
+        /* Import your styles here */
+        """
+
+        Igniter.create_new_file(igniter, css_path, content, on_exists: :skip)
+      end
     end
 
     defp maybe_create_typescript_config(igniter, false), do: igniter

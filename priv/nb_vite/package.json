@@ -1,6 +1,6 @@
 {
   "name": "@nordbeam/nb-vite",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Vite plugin for Phoenix Framework with SSR support and nb_routes auto-regeneration",
   "type": "module",
   "main": "./dist/index.js",
