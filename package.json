@@ -1,6 +1,6 @@
 {
   "name": "@nordbeam/nb-vite",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Vite plugin for Phoenix Framework",
   "type": "module",
   "main": "./priv/nb_vite/dist/index.js",
