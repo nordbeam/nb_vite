@@ -27,6 +27,7 @@
   "scripts": {
     "prebuild": "rm -rf priv/nb_vite/dist",
     "build": "cd priv/nb_vite && rollup -c rollup.config.js",
+    "postbuild": "cp priv/nb_vite/src/dev-server-index.html priv/nb_vite/dist/",
     "build:types": "cd priv/nb_vite && tsc --emitDeclarationOnly --declaration",
     "postinstall": "node -e \"try { require.resolve('@rollup/rollup-linux-x64-gnu') } catch (e) { process.exit(0) }\""
   },
