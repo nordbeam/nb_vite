@@ -292,7 +292,7 @@ var hasRequiredUtils;
 function requireUtils () {
 	if (hasRequiredUtils) return utils;
 	hasRequiredUtils = 1;
-	(function (exports) {
+	(function (exports$1) {
 
 		const path = path__default;
 		const win32 = process.platform === 'win32';
@@ -303,19 +303,19 @@ function requireUtils () {
 		  REGEX_SPECIAL_CHARS_GLOBAL
 		} = requireConstants();
 
-		exports.isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
-		exports.hasRegexChars = str => REGEX_SPECIAL_CHARS.test(str);
-		exports.isRegexChar = str => str.length === 1 && exports.hasRegexChars(str);
-		exports.escapeRegex = str => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, '\\$1');
-		exports.toPosixSlashes = str => str.replace(REGEX_BACKSLASH, '/');
+		exports$1.isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
+		exports$1.hasRegexChars = str => REGEX_SPECIAL_CHARS.test(str);
+		exports$1.isRegexChar = str => str.length === 1 && exports$1.hasRegexChars(str);
+		exports$1.escapeRegex = str => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, '\\$1');
+		exports$1.toPosixSlashes = str => str.replace(REGEX_BACKSLASH, '/');
 
-		exports.removeBackslashes = str => {
+		exports$1.removeBackslashes = str => {
 		  return str.replace(REGEX_REMOVE_BACKSLASH, match => {
 		    return match === '\\' ? '' : match;
 		  });
 		};
 
-		exports.supportsLookbehinds = () => {
+		exports$1.supportsLookbehinds = () => {
 		  const segs = process.version.slice(1).split('.').map(Number);
 		  if (segs.length === 3 && segs[0] >= 9 || (segs[0] === 8 && segs[1] >= 10)) {
 		    return true;
@@ -323,21 +323,21 @@ function requireUtils () {
 		  return false;
 		};
 
-		exports.isWindows = options => {
+		exports$1.isWindows = options => {
 		  if (options && typeof options.windows === 'boolean') {
 		    return options.windows;
 		  }
 		  return win32 === true || path.sep === '\\';
 		};
 
-		exports.escapeLast = (input, char, lastIdx) => {
+		exports$1.escapeLast = (input, char, lastIdx) => {
 		  const idx = input.lastIndexOf(char, lastIdx);
 		  if (idx === -1) return input;
-		  if (input[idx - 1] === '\\') return exports.escapeLast(input, char, idx - 1);
+		  if (input[idx - 1] === '\\') return exports$1.escapeLast(input, char, idx - 1);
 		  return `${input.slice(0, idx)}\\${input.slice(idx)}`;
 		};
 
-		exports.removePrefix = (input, state = {}) => {
+		exports$1.removePrefix = (input, state = {}) => {
 		  let output = input;
 		  if (output.startsWith('./')) {
 		    output = output.slice(2);
@@ -346,7 +346,7 @@ function requireUtils () {
 		  return output;
 		};
 
-		exports.wrapOutput = (input, state = {}, options = {}) => {
+		exports$1.wrapOutput = (input, state = {}, options = {}) => {
 		  const prepend = options.contains ? '' : '^';
 		  const append = options.contains ? '' : '$';
 
@@ -2533,10 +2533,15 @@ function resolvePluginConfig(config) {
         config.detectTls = null;
     }
     // Normalize SSR dev config
+    // If ssr is set (for production builds), auto-enable ssrDev with the same entry point
     if (config.ssrDev === true) {
         config.ssrDev = {};
     }
-    else if (config.ssrDev === undefined || config.ssrDev === false) {
+    else if (config.ssrDev === undefined) {
+        // Auto-enable ssrDev if ssr is configured (unified SSR entry)
+        config.ssrDev = typeof config.ssr === 'string' ? {} : { enabled: false };
+    }
+    else if (config.ssrDev === false) {
         config.ssrDev = { enabled: false };
     }
     if (typeof config.ssrDev === 'object') {
@@ -2551,7 +2556,11 @@ function resolvePluginConfig(config) {
             ssrDev.healthPath = '/ssr-health';
         }
         if (ssrDev.entryPoint === undefined) {
-            ssrDev.entryPoint = './js/ssr_dev.tsx';
+            // Use the ssr option as the default entry point for development
+            // This enables unified SSR entry: set ssr once, use for both dev and prod
+            ssrDev.entryPoint = typeof config.ssr === 'string'
+                ? `./${config.ssr}`
+                : './js/ssr.tsx';
         }
         if (ssrDev.hotFile === undefined) {
             ssrDev.hotFile = path$1.join('priv', 'ssr-hot');

@@ -17,8 +17,9 @@ interface SSRConfig {
      */
     healthPath?: string;
     /**
-     * The entry point for SSR rendering in development
-     * @default './js/ssr_dev.tsx'
+     * The entry point for SSR rendering in development.
+     * If not set, defaults to the `ssr` option value (unified entry for dev and prod).
+     * @default Uses `ssr` option value, or './js/ssr.tsx' if ssr is not a string
      */
     entryPoint?: string;
     /**

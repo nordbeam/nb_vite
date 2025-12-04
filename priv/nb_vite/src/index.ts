@@ -44,8 +44,9 @@ interface SSRConfig {
   healthPath?: string;
 
   /**
-   * The entry point for SSR rendering in development
-   * @default './js/ssr_dev.tsx'
+   * The entry point for SSR rendering in development.
+   * If not set, defaults to the `ssr` option value (unified entry for dev and prod).
+   * @default Uses `ssr` option value, or './js/ssr.tsx' if ssr is not a string
    */
   entryPoint?: string;
 
@@ -303,9 +304,13 @@ function resolvePluginConfig(
   }
 
   // Normalize SSR dev config
+  // If ssr is set (for production builds), auto-enable ssrDev with the same entry point
   if (config.ssrDev === true) {
     config.ssrDev = {};
-  } else if (config.ssrDev === undefined || config.ssrDev === false) {
+  } else if (config.ssrDev === undefined) {
+    // Auto-enable ssrDev if ssr is configured (unified SSR entry)
+    config.ssrDev = typeof config.ssr === 'string' ? {} : { enabled: false };
+  } else if (config.ssrDev === false) {
     config.ssrDev = { enabled: false };
   }
 
@@ -321,7 +326,11 @@ function resolvePluginConfig(
       ssrDev.healthPath = '/ssr-health';
     }
     if (ssrDev.entryPoint === undefined) {
-      ssrDev.entryPoint = './js/ssr_dev.tsx';
+      // Use the ssr option as the default entry point for development
+      // This enables unified SSR entry: set ssr once, use for both dev and prod
+      ssrDev.entryPoint = typeof config.ssr === 'string'
+        ? `./${config.ssr}`
+        : './js/ssr.tsx';
     }
     if (ssrDev.hotFile === undefined) {
       ssrDev.hotFile = path.join('priv', 'ssr-hot');
