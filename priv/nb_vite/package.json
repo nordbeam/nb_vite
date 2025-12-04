@@ -25,7 +25,7 @@
   ],
   "scripts": {
     "prebuild": "rm -rf dist",
-    "build": "rollup -c rollup.config.js",
+    "build": "rollup -c rollup.config.js && cp src/dev-server-index.html dist/",
     "build:types": "tsc --emitDeclarationOnly --declaration",
     "prepublishOnly": "npm run build"
   },
