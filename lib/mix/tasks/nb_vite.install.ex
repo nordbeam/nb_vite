@@ -487,7 +487,7 @@ if Code.ensure_loaded?(Igniter) do
     defp build_dev_dependencies(features) do
       dev_deps = %{
         "vite" => "^7.0.0",
-        "@nordbeam/nb-vite" => "^0.2.0",
+        "@nordbeam/nb-vite" => "github:nordbeam/nb_vite",
         "@types/phoenix" => "^1.6.0"
       }
 
