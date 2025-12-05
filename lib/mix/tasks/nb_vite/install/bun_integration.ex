@@ -255,7 +255,12 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
   def update_package_json(package_json, igniter) do
     if using_bun?(igniter) || igniter.assigns[:bun_workspaces_needed] do
       package_json
-      |> Map.put("workspaces", ["../deps/*"])
+      # Only include Phoenix packages in workspaces, not all deps
+      |> Map.put("workspaces", [
+        "../deps/phoenix",
+        "../deps/phoenix_html",
+        "../deps/phoenix_live_view"
+      ])
       |> Map.update!("dependencies", fn deps ->
         Map.merge(deps, %{
           "phoenix" => "workspace:*",

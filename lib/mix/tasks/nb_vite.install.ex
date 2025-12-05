@@ -435,7 +435,9 @@ if Code.ensure_loaded?(Igniter) do
         "version" => "0.0.0",
         "type" => "module",
         "private" => true,
-        "workspaces" => ["../deps/*"],
+        # Only include Phoenix packages in workspaces, not all deps
+        # This prevents conflicts with nb packages that have their own package.json
+        "workspaces" => ["../deps/phoenix", "../deps/phoenix_html", "../deps/phoenix_live_view"],
         "dependencies" => dependencies,
         "devDependencies" => dev_dependencies,
         "scripts" => %{
