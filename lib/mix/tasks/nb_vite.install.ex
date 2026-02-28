@@ -31,7 +31,6 @@ if Code.ensure_loaded?(Igniter) do
     """
 
     use Igniter.Mix.Task
-    require Igniter.Code.Common
 
     alias Mix.Tasks.NbVite.Install.BunIntegration
 
