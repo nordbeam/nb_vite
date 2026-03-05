@@ -65,5 +65,33 @@ export default [
         tsconfig: "./tsconfig.json",
       }),
     ],
+  },
+  // nb-inertia plugin
+  {
+    input: "src/vite-plugin-nb-inertia.ts",
+    output: {
+      file: "dist/vite-plugin-nb-inertia.js",
+      format: "esm",
+      inlineDynamicImports: true,
+    },
+    external: [
+      "vite",
+      "node:fs",
+      "node:path",
+      "node:child_process",
+      "fs",
+      "path",
+      "child_process"
+    ],
+    plugins: [
+      resolve({
+        preferBuiltins: true,
+        browser: false,
+      }),
+      commonjs(),
+      typescript({
+        tsconfig: "./tsconfig.json",
+      }),
+    ],
   }
 ];

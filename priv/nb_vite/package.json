@@ -1,7 +1,7 @@
 {
   "name": "@nordbeam/nb-vite",
   "version": "0.3.3",
-  "description": "Vite plugin for Phoenix Framework with SSR support and nb_routes auto-regeneration",
+  "description": "Vite plugin for Phoenix Framework with SSR support, nb_routes auto-regeneration, and nb_inertia colocated pages",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,6 +13,10 @@
     "./nb-routes": {
       "import": "./dist/vite-plugin-nb-routes.js",
       "types": "./dist/vite-plugin-nb-routes.d.ts"
+    },
+    "./nb-inertia": {
+      "import": "./dist/vite-plugin-nb-inertia.js",
+      "types": "./dist/vite-plugin-nb-inertia.d.ts"
     }
   },
   "files": [
@@ -38,6 +42,9 @@
     "ssr",
     "server-side-rendering",
     "nb_routes",
+    "nb_inertia",
+    "inertia",
+    "colocated-pages",
     "phoenix-framework",
     "react",
     "vue"
