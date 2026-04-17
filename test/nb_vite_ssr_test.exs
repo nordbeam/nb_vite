@@ -12,14 +12,14 @@ defmodule NbVite.SSRTest do
         enabled: true,
         path: "/ssr",
         healthPath: "/ssr-health",
-        entryPoint: "./js/ssr_dev.tsx",
+        entryPoint: "./js/ssr.tsx",
         hotFile: "priv/ssr-hot"
       }
 
       assert config.enabled == true
       assert config.path == "/ssr"
       assert config.healthPath == "/ssr-health"
-      assert config.entryPoint == "./js/ssr_dev.tsx"
+      assert config.entryPoint == "./js/ssr.tsx"
       assert config.hotFile == "priv/ssr-hot"
     end
 

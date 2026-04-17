@@ -2869,6 +2869,9 @@ function resolvePhoenixPlugin(pluginConfig) {
                             https: userConfig?.server?.https ?? serverConfig.https,
                         }
                         : {
+                            // Use 127.0.0.1 to ensure IPv4 binding for Erlang :httpc compatibility
+                            // On macOS, "localhost" resolves to IPv6 (::1) which :httpc can't connect to
+                            host: userConfig?.server?.host ?? "127.0.0.1",
                             hmr: userConfig?.server?.hmr === false
                                 ? false
                                 : {

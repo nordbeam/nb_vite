@@ -141,13 +141,17 @@ defmodule NbVite do
 
     case Map.get(manifest, entry) do
       nil ->
-        # For CSS files with Tailwind CSS 4.x, the @tailwindcss/vite plugin
-        # handles CSS injection automatically without a manifest entry.
-        # Return empty string instead of crashing.
-        if String.ends_with?(entry, ".css") do
+        if manifest == %{} and allow_missing_manifest?() do
           Phoenix.HTML.raw("")
         else
-          raise "Asset '#{entry}' not found in Vite manifest"
+          # For CSS files with Tailwind CSS 4.x, the @tailwindcss/vite plugin
+          # handles CSS injection automatically without a manifest entry.
+          # Return empty string instead of crashing.
+          if String.ends_with?(entry, ".css") do
+            Phoenix.HTML.raw("")
+          else
+            raise "Asset '#{entry}' not found in Vite manifest"
+          end
         end
 
       %{"file" => file} = entry_data ->
@@ -220,31 +224,65 @@ defmodule NbVite do
   end
 
   defp load_manifest do
-    manifest_path = get_manifest_path()
+    case find_manifest_path() do
+      {:ok, manifest_path} ->
+        case File.read(manifest_path) do
+          {:ok, content} ->
+            case Jason.decode(content) do
+              {:ok, manifest} -> manifest
+              {:error, _} -> raise "Failed to parse Vite manifest"
+            end
 
-    case File.read(manifest_path) do
-      {:ok, content} ->
-        case Jason.decode(content) do
-          {:ok, manifest} -> manifest
-          {:error, _} -> raise "Failed to parse Vite manifest"
+          {:error, _} ->
+            raise "Vite manifest not found. Run 'mix assets.build' to build assets."
         end
 
-      {:error, _} ->
-        raise "Vite manifest not found. Run 'mix assets.build' to build assets."
+      :error ->
+        if allow_missing_manifest?() do
+          %{}
+        else
+          raise "Vite manifest not found. Run 'mix assets.build' to build assets."
+        end
     end
   end
 
-  defp get_manifest_path do
-    default_path =
-      case app_priv_dir() do
-        {:ok, priv_dir} ->
-          Path.join([priv_dir, "static", "assets", "manifest.json"])
+  defp find_manifest_path do
+    manifest_paths()
+    |> Enum.find(&File.exists?/1)
+    |> case do
+      nil -> :error
+      path -> {:ok, path}
+    end
+  end
 
-        :error ->
-          Path.join([File.cwd!(), "priv", "static", "assets", "manifest.json"])
-      end
+  defp manifest_paths do
+    case Application.get_env(:nb_vite, :manifest_path) do
+      nil ->
+        default_manifest_paths()
 
-    Application.get_env(:nb_vite, :manifest_path, default_path)
+      manifest_path ->
+        [manifest_path]
+    end
+  end
+
+  defp default_manifest_paths do
+    case app_priv_dir() do
+      {:ok, priv_dir} ->
+        [
+          Path.join([priv_dir, "static", "assets", "manifest.json"]),
+          Path.join([priv_dir, "static", "assets", ".vite", "manifest.json"])
+        ]
+
+      :error ->
+        [
+          Path.join([File.cwd!(), "priv", "static", "assets", "manifest.json"]),
+          Path.join([File.cwd!(), "priv", "static", "assets", ".vite", "manifest.json"])
+        ]
+    end
+  end
+
+  defp allow_missing_manifest? do
+    Application.get_env(:nb_vite, :allow_missing_manifest, false)
   end
 
   defp app_priv_dir do

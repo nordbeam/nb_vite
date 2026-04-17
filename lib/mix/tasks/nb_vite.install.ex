@@ -46,7 +46,7 @@ if Code.ensure_loaded?(Igniter) do
         ],
         defaults: [],
         positional: [],
-        composes: ["deps.get"]
+        composes: []
       }
     end
 
@@ -59,6 +59,7 @@ if Code.ensure_loaded?(Igniter) do
       |> Igniter.Project.Formatter.import_dep(:nb_vite)
       |> BunIntegration.integrate()
       |> configure_otp_app()
+      |> configure_test_env()
       |> setup_html_helpers()
       |> create_vite_config()
       |> update_package_json()
@@ -94,6 +95,16 @@ if Code.ensure_loaded?(Igniter) do
         :nb_vite,
         [:otp_app],
         app_name
+      )
+    end
+
+    defp configure_test_env(igniter) do
+      Igniter.Project.Config.configure(
+        igniter,
+        "test.exs",
+        :nb_vite,
+        [:allow_missing_manifest],
+        true
       )
     end
 
@@ -252,6 +263,7 @@ if Code.ensure_loaded?(Igniter) do
                   entryFileNames: "ssr.js",
                   footer: "globalThis.render = render;",
                 },
+                external: (id) => id.startsWith('node:'),
               },
             },
             resolve: {
@@ -348,6 +360,7 @@ if Code.ensure_loaded?(Igniter) do
     defp build_additional_options(options) do
       config_items = []
       config_items = maybe_add_config(config_items, "refresh: true", true)
+      extension = if options[:typescript], do: "tsx", else: "jsx"
 
       # Don't add reactRefresh option - @vitejs/plugin-react handles it automatically
       # The phoenix plugin warns if reactRefresh is true but React plugin is not detected,
@@ -362,7 +375,7 @@ if Code.ensure_loaded?(Igniter) do
                     enabled: true,
                     path: '/ssr',
                     healthPath: '/ssr-health',
-                    entryPoint: './js/ssr_dev.tsx',
+                    entryPoint: './js/ssr.#{extension}',
                     hotFile: '../priv/ssr-hot',
                   }
           """
@@ -1039,9 +1052,13 @@ else
 
         mix nb_vite.setup
 
-    To use the full installer with automatic configuration, install igniter:
+    Add to your mix.exs for direct task usage:
 
-        {:igniter, "~> 0.5", only: [:dev]}
+        {:igniter, "~> 0.7", only: [:dev, :test]}
+
+    Or install Igniter first and use the preferred installer flow:
+
+        mix igniter.install nb_vite
 
     Then run:
 
@@ -1052,9 +1069,19 @@ else
     use Mix.Task
 
     def run(_argv) do
-      Mix.shell().info("""
+      Mix.shell().error("""
       The task 'nb_vite.install' requires igniter for automatic installation.
+
+      Add to your mix.exs for direct task usage:
+
+          {:igniter, "~> 0.7", only: [:dev, :test]}
+
+      Or install Igniter first and use the preferred installer flow:
+
+          mix igniter.install nb_vite
       """)
+
+      exit({:shutdown, 1})
     end
   end
 end
