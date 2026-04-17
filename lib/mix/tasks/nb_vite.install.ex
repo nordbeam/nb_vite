@@ -491,7 +491,7 @@ if Code.ensure_loaded?(Igniter) do
         Map.merge(deps, %{
           "react" => "^19.1.0",
           "react-dom" => "^19.1.0",
-          "@vitejs/plugin-react" => "^4.3.4"
+          "@vitejs/plugin-react" => "^6.0.1"
         })
       else
         deps
@@ -500,7 +500,7 @@ if Code.ensure_loaded?(Igniter) do
 
     defp build_dev_dependencies(features) do
       dev_deps = %{
-        "vite" => "^7.0.0",
+        "vite" => "^8.0.8",
         "@nordbeam/nb-vite" => "github:nordbeam/nb_vite",
         "@types/phoenix" => "^1.6.0"
       }
