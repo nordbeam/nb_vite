@@ -692,10 +692,7 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp web_dir(igniter) do
-      igniter
-      |> Igniter.Libs.Phoenix.web_module()
-      |> inspect()
-      |> Macro.underscore()
+      "#{Igniter.Project.Application.app_name(igniter)}_web"
     end
 
     defp detect_phoenix_1_8(igniter) do

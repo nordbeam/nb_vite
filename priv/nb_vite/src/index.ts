@@ -12,6 +12,7 @@ import {
   ManifestChunk,
   PluginOption,
   loadEnv,
+  searchForWorkspaceRoot,
   SSROptions,
   Rollup,
   ViteDevServer,
@@ -139,6 +140,19 @@ interface PluginConfig {
    */
   transformOnServe?: (code: string, url: string) => string;
 }
+
+interface LocalDependencySupport {
+  aliases: Array<{ find: string | RegExp; replacement: string }>;
+  fsAllow: string[];
+  dedupe: string[];
+  optimizeDepsExclude: string[];
+}
+
+type ResolveAliasInput = NonNullable<
+  NonNullable<UserConfig["resolve"]>["alias"]
+>;
+
+type ServerFsInput = NonNullable<NonNullable<UserConfig["server"]>["fs"]>;
 
 interface RefreshConfig {
   paths: string[];
@@ -586,11 +600,14 @@ function resolvePhoenixPlugin(
     config: (config, env) => {
       userConfig = config;
       const ssr = !!userConfig.build?.ssr;
+      const rootDirectory = path.resolve(userConfig.root || process.cwd());
       const environment = loadEnv(
         env.mode,
         userConfig.envDir || process.cwd(),
         "",
       );
+      const localDependencySupport =
+        resolveLocalPathDependencySupport(rootDirectory);
       const assetUrl = environment.ASSET_URL ?? "assets";
       const serverConfig =
         env.command === "serve"
@@ -628,28 +645,23 @@ function resolvePhoenixPlugin(
           assetsInlineLimit: userConfig.build?.assetsInlineLimit ?? 0,
         },
         resolve: {
-          alias: Array.isArray(userConfig?.resolve?.alias)
-            ? [
-                ...(userConfig.resolve.alias as Array<{
-                  find: string;
-                  replacement: string;
-                }>),
-                ...Object.entries(defaultAliases).map(
-                  ([find, replacement]) => ({ find, replacement }),
-                ),
-                ...Object.entries(phoenixAliases).map(
-                  ([find, replacement]) => ({ find, replacement }),
-                ),
-                ...Object.entries(colocatedAliases).map(
-                  ([find, replacement]) => ({ find, replacement }),
-                ),
-              ]
-            : {
-                ...defaultAliases,
-                ...phoenixAliases,
-                ...colocatedAliases,
-                ...(userConfig?.resolve?.alias as Record<string, string>),
-              },
+          alias: [
+            ...normalizeAliasEntries(userConfig?.resolve?.alias),
+            ...localDependencySupport.aliases,
+            ...Object.entries(defaultAliases).map(
+              ([find, replacement]) => ({ find, replacement }),
+            ),
+            ...Object.entries(phoenixAliases).map(
+              ([find, replacement]) => ({ find, replacement }),
+            ),
+            ...Object.entries(colocatedAliases).map(
+              ([find, replacement]) => ({ find, replacement }),
+            ),
+          ],
+          dedupe: [
+            ...(userConfig?.resolve?.dedupe || []),
+            ...localDependencySupport.dedupe,
+          ],
         },
         ssr: {
           noExternal: noExternalInertiaHelpers(userConfig),
@@ -667,6 +679,10 @@ function resolvePhoenixPlugin(
             "phoenix_html",
             "phoenix_live_view",
             ...(userConfig?.optimizeDeps?.include || []),
+          ],
+          exclude: [
+            ...(userConfig?.optimizeDeps?.exclude || []),
+            ...localDependencySupport.optimizeDepsExclude,
           ],
         },
         server: {
@@ -691,6 +707,11 @@ function resolvePhoenixPlugin(
               /^https?:\/\/.*\.localhost(?::\d+)?$/, // *.localhost subdomains
             ],
           },
+          fs: mergeServerFsAllow(
+            userConfig?.server?.fs,
+            localDependencySupport.fsAllow,
+            rootDirectory,
+          ),
           // Handle Docker/container environments
           ...(environment.PHOENIX_DOCKER || environment.DOCKER_ENV
             ? {
@@ -1353,6 +1374,231 @@ function pluginVersion(): string {
     // Ignore errors
   }
   return "unknown";
+}
+
+function normalizeAliasEntries(
+  aliases?: ResolveAliasInput,
+): Array<{ find: string | RegExp; replacement: string }> {
+  if (!aliases) {
+    return [];
+  }
+
+  if (Array.isArray(aliases)) {
+    return aliases as Array<{ find: string | RegExp; replacement: string }>;
+  }
+
+  return Object.entries(aliases as Record<string, string>).map(
+    ([find, replacement]) => ({ find, replacement }),
+  );
+}
+
+function mergeServerFsAllow(
+  existingFs: ServerFsInput | undefined,
+  localAllow: string[],
+  rootDirectory: string,
+) {
+  const defaultAllow = [searchForWorkspaceRoot(rootDirectory), rootDirectory];
+
+  if (localAllow.length === 0 && !existingFs?.allow) {
+    return existingFs;
+  }
+
+  const existingAllow = Array.isArray(existingFs?.allow) ? existingFs.allow : [];
+
+  return {
+    ...(existingFs && typeof existingFs === "object" ? existingFs : {}),
+    allow: [...new Set([...defaultAllow, ...existingAllow, ...localAllow])],
+  };
+}
+
+function resolveLocalPathDependencySupport(
+  rootDirectory: string,
+): LocalDependencySupport {
+  const packageJsonPath = path.join(rootDirectory, "package.json");
+
+  if (!fs.existsSync(packageJsonPath)) {
+    return { aliases: [], fsAllow: [], dedupe: [], optimizeDepsExclude: [] };
+  }
+
+  try {
+    const packageJson = JSON.parse(
+      fs.readFileSync(packageJsonPath, "utf-8"),
+    ) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    const allDependencies = {
+      ...(packageJson.dependencies || {}),
+      ...(packageJson.devDependencies || {}),
+    };
+
+    const aliases: Array<{ find: string | RegExp; replacement: string }> = [];
+    const fsAllow = new Set<string>();
+    const dedupe = new Set<string>();
+    const optimizeDepsExclude = new Set<string>();
+
+    for (const [packageName, spec] of Object.entries(allDependencies)) {
+      const localDependencyPath = resolveLocalDependencyPath(rootDirectory, spec);
+
+      if (!localDependencyPath) {
+        continue;
+      }
+
+      const dependencyRoot = fs.realpathSync(localDependencyPath);
+      const dependencyPackageJsonPath = path.join(dependencyRoot, "package.json");
+
+      if (!fs.existsSync(dependencyPackageJsonPath)) {
+        continue;
+      }
+
+      const dependencyPackageJson = JSON.parse(
+        fs.readFileSync(dependencyPackageJsonPath, "utf-8"),
+      ) as {
+        exports?: unknown;
+        main?: string;
+        module?: string;
+        peerDependencies?: Record<string, string>;
+      };
+
+      const resolvedAliases = resolveLocalDependencyAliases(
+        packageName,
+        dependencyRoot,
+        dependencyPackageJson,
+      );
+
+      if (resolvedAliases.length === 0) {
+        continue;
+      }
+
+      fsAllow.add(dependencyRoot);
+      for (const peerDependency of Object.keys(dependencyPackageJson.peerDependencies || {})) {
+        dedupe.add(peerDependency);
+      }
+
+      for (const alias of resolvedAliases) {
+        aliases.push({
+          find: new RegExp(`^${escapeForRegExp(alias.find)}$`),
+          replacement: alias.replacement,
+        });
+        optimizeDepsExclude.add(alias.find);
+      }
+    }
+
+    return {
+      aliases,
+      fsAllow: [...fsAllow],
+      dedupe: [...dedupe],
+      optimizeDepsExclude: [...optimizeDepsExclude],
+    };
+  } catch {
+    return { aliases: [], fsAllow: [], dedupe: [], optimizeDepsExclude: [] };
+  }
+}
+
+function resolveLocalDependencyPath(
+  rootDirectory: string,
+  spec: string,
+): string | null {
+  let normalizedSpec = spec;
+
+  if (normalizedSpec.startsWith("file:")) {
+    normalizedSpec = normalizedSpec.slice("file:".length);
+  } else if (normalizedSpec.startsWith("link:")) {
+    normalizedSpec = normalizedSpec.slice("link:".length);
+  } else if (
+    !normalizedSpec.startsWith("./") &&
+    !normalizedSpec.startsWith("../") &&
+    !path.isAbsolute(normalizedSpec)
+  ) {
+    return null;
+  }
+
+  return path.resolve(rootDirectory, normalizedSpec);
+}
+
+function resolveLocalDependencyAliases(
+  packageName: string,
+  dependencyRoot: string,
+  dependencyPackageJson: {
+    exports?: unknown;
+    main?: string;
+    module?: string;
+  },
+): Array<{ find: string; replacement: string }> {
+  const aliases: Array<{ find: string; replacement: string }> = [];
+  const seen = new Set<string>();
+
+  const pushAlias = (find: string, target: string | null) => {
+    if (!target || seen.has(find) || target.includes("*")) {
+      return;
+    }
+
+    aliases.push({
+      find,
+      replacement: path.resolve(dependencyRoot, target),
+    });
+    seen.add(find);
+  };
+
+  const exportsField = dependencyPackageJson.exports;
+
+  if (typeof exportsField === "string") {
+    pushAlias(packageName, exportsField);
+  } else if (exportsField && typeof exportsField === "object") {
+    const directTarget = resolveExportTarget(exportsField);
+    pushAlias(packageName, directTarget);
+
+    for (const [exportPath, exportValue] of Object.entries(exportsField)) {
+      if (!exportPath.startsWith(".") || exportPath.includes("*")) {
+        continue;
+      }
+
+      const target = resolveExportTarget(exportValue);
+      const specifier =
+        exportPath === "."
+          ? packageName
+          : `${packageName}/${exportPath.slice(2)}`;
+
+      pushAlias(specifier, target);
+    }
+  }
+
+  if (aliases.length === 0) {
+    pushAlias(packageName, dependencyPackageJson.module || dependencyPackageJson.main || null);
+  }
+
+  return aliases;
+}
+
+function resolveExportTarget(exportValue: unknown): string | null {
+  if (typeof exportValue === "string") {
+    return exportValue;
+  }
+
+  if (!exportValue || typeof exportValue !== "object" || Array.isArray(exportValue)) {
+    return null;
+  }
+
+  const conditions = exportValue as Record<string, unknown>;
+
+  if (typeof conditions.import === "string") {
+    return conditions.import;
+  }
+
+  if (typeof conditions.default === "string") {
+    return conditions.default;
+  }
+
+  if (typeof conditions.module === "string") {
+    return conditions.module;
+  }
+
+  return null;
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function resolveFullReloadConfig({

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path$1 from 'node:path';
 import os from 'node:os';
-import { normalizePath, loadEnv } from 'vite';
+import { normalizePath, loadEnv, searchForWorkspaceRoot } from 'vite';
 import * as path from 'path';
 import path__default, { resolve, relative } from 'path';
 import { spawn } from 'child_process';
@@ -292,7 +292,7 @@ var hasRequiredUtils;
 function requireUtils () {
 	if (hasRequiredUtils) return utils;
 	hasRequiredUtils = 1;
-	(function (exports$1) {
+	(function (exports) {
 
 		const path = path__default;
 		const win32 = process.platform === 'win32';
@@ -303,19 +303,19 @@ function requireUtils () {
 		  REGEX_SPECIAL_CHARS_GLOBAL
 		} = requireConstants();
 
-		exports$1.isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
-		exports$1.hasRegexChars = str => REGEX_SPECIAL_CHARS.test(str);
-		exports$1.isRegexChar = str => str.length === 1 && exports$1.hasRegexChars(str);
-		exports$1.escapeRegex = str => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, '\\$1');
-		exports$1.toPosixSlashes = str => str.replace(REGEX_BACKSLASH, '/');
+		exports.isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
+		exports.hasRegexChars = str => REGEX_SPECIAL_CHARS.test(str);
+		exports.isRegexChar = str => str.length === 1 && exports.hasRegexChars(str);
+		exports.escapeRegex = str => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, '\\$1');
+		exports.toPosixSlashes = str => str.replace(REGEX_BACKSLASH, '/');
 
-		exports$1.removeBackslashes = str => {
+		exports.removeBackslashes = str => {
 		  return str.replace(REGEX_REMOVE_BACKSLASH, match => {
 		    return match === '\\' ? '' : match;
 		  });
 		};
 
-		exports$1.supportsLookbehinds = () => {
+		exports.supportsLookbehinds = () => {
 		  const segs = process.version.slice(1).split('.').map(Number);
 		  if (segs.length === 3 && segs[0] >= 9 || (segs[0] === 8 && segs[1] >= 10)) {
 		    return true;
@@ -323,21 +323,21 @@ function requireUtils () {
 		  return false;
 		};
 
-		exports$1.isWindows = options => {
+		exports.isWindows = options => {
 		  if (options && typeof options.windows === 'boolean') {
 		    return options.windows;
 		  }
 		  return win32 === true || path.sep === '\\';
 		};
 
-		exports$1.escapeLast = (input, char, lastIdx) => {
+		exports.escapeLast = (input, char, lastIdx) => {
 		  const idx = input.lastIndexOf(char, lastIdx);
 		  if (idx === -1) return input;
-		  if (input[idx - 1] === '\\') return exports$1.escapeLast(input, char, idx - 1);
+		  if (input[idx - 1] === '\\') return exports.escapeLast(input, char, idx - 1);
 		  return `${input.slice(0, idx)}\\${input.slice(idx)}`;
 		};
 
-		exports$1.removePrefix = (input, state = {}) => {
+		exports.removePrefix = (input, state = {}) => {
 		  let output = input;
 		  if (output.startsWith('./')) {
 		    output = output.slice(2);
@@ -346,7 +346,7 @@ function requireUtils () {
 		  return output;
 		};
 
-		exports$1.wrapOutput = (input, state = {}, options = {}) => {
+		exports.wrapOutput = (input, state = {}, options = {}) => {
 		  const prepend = options.contains ? '' : '^';
 		  const append = options.contains ? '' : '$';
 
@@ -2765,7 +2765,9 @@ function resolvePhoenixPlugin(pluginConfig) {
         config: (config, env) => {
             userConfig = config;
             const ssr = !!userConfig.build?.ssr;
+            const rootDirectory = path$1.resolve(userConfig.root || process.cwd());
             const environment = loadEnv(env.mode, userConfig.envDir || process.cwd(), "");
+            const localDependencySupport = resolveLocalPathDependencySupport(rootDirectory);
             const assetUrl = environment.ASSET_URL ?? "assets";
             const serverConfig = env.command === "serve"
                 ? (resolveDevelopmentEnvironmentServerConfig(pluginConfig.detectTls, environment) ?? resolveEnvironmentServerConfig(environment))
@@ -2793,19 +2795,17 @@ function resolvePhoenixPlugin(pluginConfig) {
                     assetsInlineLimit: userConfig.build?.assetsInlineLimit ?? 0,
                 },
                 resolve: {
-                    alias: Array.isArray(userConfig?.resolve?.alias)
-                        ? [
-                            ...userConfig.resolve.alias,
-                            ...Object.entries(defaultAliases).map(([find, replacement]) => ({ find, replacement })),
-                            ...Object.entries(phoenixAliases).map(([find, replacement]) => ({ find, replacement })),
-                            ...Object.entries(colocatedAliases).map(([find, replacement]) => ({ find, replacement })),
-                        ]
-                        : {
-                            ...defaultAliases,
-                            ...phoenixAliases,
-                            ...colocatedAliases,
-                            ...userConfig?.resolve?.alias,
-                        },
+                    alias: [
+                        ...normalizeAliasEntries(userConfig?.resolve?.alias),
+                        ...localDependencySupport.aliases,
+                        ...Object.entries(defaultAliases).map(([find, replacement]) => ({ find, replacement })),
+                        ...Object.entries(phoenixAliases).map(([find, replacement]) => ({ find, replacement })),
+                        ...Object.entries(colocatedAliases).map(([find, replacement]) => ({ find, replacement })),
+                    ],
+                    dedupe: [
+                        ...(userConfig?.resolve?.dedupe || []),
+                        ...localDependencySupport.dedupe,
+                    ],
                 },
                 ssr: {
                     noExternal: noExternalInertiaHelpers(userConfig),
@@ -2821,6 +2821,10 @@ function resolvePhoenixPlugin(pluginConfig) {
                         "phoenix_html",
                         "phoenix_live_view",
                         ...(userConfig?.optimizeDeps?.include || []),
+                    ],
+                    exclude: [
+                        ...(userConfig?.optimizeDeps?.exclude || []),
+                        ...localDependencySupport.optimizeDepsExclude,
                     ],
                 },
                 server: {
@@ -2844,6 +2848,7 @@ function resolvePhoenixPlugin(pluginConfig) {
                             /^https?:\/\/.*\.localhost(?::\d+)?$/, // *.localhost subdomains
                         ],
                     },
+                    fs: mergeServerFsAllow(userConfig?.server?.fs, localDependencySupport.fsAllow, rootDirectory),
                     // Handle Docker/container environments
                     ...(environment.PHOENIX_DOCKER || environment.DOCKER_ENV
                         ? {
@@ -3295,6 +3300,152 @@ function pluginVersion() {
         // Ignore errors
     }
     return "unknown";
+}
+function normalizeAliasEntries(aliases) {
+    if (!aliases) {
+        return [];
+    }
+    if (Array.isArray(aliases)) {
+        return aliases;
+    }
+    return Object.entries(aliases).map(([find, replacement]) => ({ find, replacement }));
+}
+function mergeServerFsAllow(existingFs, localAllow, rootDirectory) {
+    const defaultAllow = [searchForWorkspaceRoot(rootDirectory), rootDirectory];
+    if (localAllow.length === 0 && !existingFs?.allow) {
+        return existingFs;
+    }
+    const existingAllow = Array.isArray(existingFs?.allow) ? existingFs.allow : [];
+    return {
+        ...(existingFs && typeof existingFs === "object" ? existingFs : {}),
+        allow: [...new Set([...defaultAllow, ...existingAllow, ...localAllow])],
+    };
+}
+function resolveLocalPathDependencySupport(rootDirectory) {
+    const packageJsonPath = path$1.join(rootDirectory, "package.json");
+    if (!fs.existsSync(packageJsonPath)) {
+        return { aliases: [], fsAllow: [], dedupe: [], optimizeDepsExclude: [] };
+    }
+    try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+        const allDependencies = {
+            ...(packageJson.dependencies || {}),
+            ...(packageJson.devDependencies || {}),
+        };
+        const aliases = [];
+        const fsAllow = new Set();
+        const dedupe = new Set();
+        const optimizeDepsExclude = new Set();
+        for (const [packageName, spec] of Object.entries(allDependencies)) {
+            const localDependencyPath = resolveLocalDependencyPath(rootDirectory, spec);
+            if (!localDependencyPath) {
+                continue;
+            }
+            const dependencyRoot = fs.realpathSync(localDependencyPath);
+            const dependencyPackageJsonPath = path$1.join(dependencyRoot, "package.json");
+            if (!fs.existsSync(dependencyPackageJsonPath)) {
+                continue;
+            }
+            const dependencyPackageJson = JSON.parse(fs.readFileSync(dependencyPackageJsonPath, "utf-8"));
+            const resolvedAliases = resolveLocalDependencyAliases(packageName, dependencyRoot, dependencyPackageJson);
+            if (resolvedAliases.length === 0) {
+                continue;
+            }
+            fsAllow.add(dependencyRoot);
+            for (const peerDependency of Object.keys(dependencyPackageJson.peerDependencies || {})) {
+                dedupe.add(peerDependency);
+            }
+            for (const alias of resolvedAliases) {
+                aliases.push({
+                    find: new RegExp(`^${escapeForRegExp(alias.find)}$`),
+                    replacement: alias.replacement,
+                });
+                optimizeDepsExclude.add(alias.find);
+            }
+        }
+        return {
+            aliases,
+            fsAllow: [...fsAllow],
+            dedupe: [...dedupe],
+            optimizeDepsExclude: [...optimizeDepsExclude],
+        };
+    }
+    catch {
+        return { aliases: [], fsAllow: [], dedupe: [], optimizeDepsExclude: [] };
+    }
+}
+function resolveLocalDependencyPath(rootDirectory, spec) {
+    let normalizedSpec = spec;
+    if (normalizedSpec.startsWith("file:")) {
+        normalizedSpec = normalizedSpec.slice("file:".length);
+    }
+    else if (normalizedSpec.startsWith("link:")) {
+        normalizedSpec = normalizedSpec.slice("link:".length);
+    }
+    else if (!normalizedSpec.startsWith("./") &&
+        !normalizedSpec.startsWith("../") &&
+        !path$1.isAbsolute(normalizedSpec)) {
+        return null;
+    }
+    return path$1.resolve(rootDirectory, normalizedSpec);
+}
+function resolveLocalDependencyAliases(packageName, dependencyRoot, dependencyPackageJson) {
+    const aliases = [];
+    const seen = new Set();
+    const pushAlias = (find, target) => {
+        if (!target || seen.has(find) || target.includes("*")) {
+            return;
+        }
+        aliases.push({
+            find,
+            replacement: path$1.resolve(dependencyRoot, target),
+        });
+        seen.add(find);
+    };
+    const exportsField = dependencyPackageJson.exports;
+    if (typeof exportsField === "string") {
+        pushAlias(packageName, exportsField);
+    }
+    else if (exportsField && typeof exportsField === "object") {
+        const directTarget = resolveExportTarget(exportsField);
+        pushAlias(packageName, directTarget);
+        for (const [exportPath, exportValue] of Object.entries(exportsField)) {
+            if (!exportPath.startsWith(".") || exportPath.includes("*")) {
+                continue;
+            }
+            const target = resolveExportTarget(exportValue);
+            const specifier = exportPath === "."
+                ? packageName
+                : `${packageName}/${exportPath.slice(2)}`;
+            pushAlias(specifier, target);
+        }
+    }
+    if (aliases.length === 0) {
+        pushAlias(packageName, dependencyPackageJson.module || dependencyPackageJson.main || null);
+    }
+    return aliases;
+}
+function resolveExportTarget(exportValue) {
+    if (typeof exportValue === "string") {
+        return exportValue;
+    }
+    if (!exportValue || typeof exportValue !== "object" || Array.isArray(exportValue)) {
+        return null;
+    }
+    const conditions = exportValue;
+    if (typeof conditions.import === "string") {
+        return conditions.import;
+    }
+    if (typeof conditions.default === "string") {
+        return conditions.default;
+    }
+    if (typeof conditions.module === "string") {
+        return conditions.module;
+    }
+    return null;
+}
+function escapeForRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function resolveFullReloadConfig({ refresh: config, }) {
     if (typeof config === "boolean") {
