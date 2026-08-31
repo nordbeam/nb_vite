@@ -120,10 +120,8 @@ defmodule Mix.Tasks.NbVite.Deps do
 
       $ mix nb_vite.deps
 
-  Uses the package manager selected by the assets lockfile. Vite+ remains the
-  project toolchain for development, checks, tests, and builds, while package
-  installation stays with npm, pnpm, Yarn, or Bun and does not rewrite the
-  manifest with Vite+ CLI engine pins.
+  Vite+ installs the assets dependencies and enforces the generated npm 12
+  project baseline.
   """
   @shortdoc "Installs JavaScript dependencies using Vite+"
 
@@ -137,6 +135,9 @@ defmodule Mix.Tasks.NbVite.Deps do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    Mix.shell().cmd(Elixir.NbVite.VitePlus.dependency_command(assets_dir), cd: assets_dir)
+    Mix.shell().cmd(
+      Elixir.NbVite.VitePlus.command(["install"], assets_dir),
+      cd: assets_dir
+    )
   end
 end

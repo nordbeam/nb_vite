@@ -50,9 +50,8 @@ The installer and `mix nb_vite` tasks do not require a global CLI: they prefer
 global `vp`, then `assets/node_modules/.bin/vp`, and finally bootstrap the
 pinned CLI with `npm exec --yes --package=vite-plus@0.3.0 -- vp ...`.
 For an existing app, run `mix nb_vite.deps` after migrating its manifest.
-The task uses the package manager selected by the assets lockfile (npm by
-default), avoiding the npm engine pins that `vp install` adds in Vite+ 0.3.
-The Nordbeam package source remains GitHub.
+The generated manifest requires npm 12.0.2, and `mix nb_vite.deps` runs the
+Vite+ installer. The Nordbeam package source remains GitHub.
 
 **Benefits of using the package:**
 - Standard package dependency management through Vite+

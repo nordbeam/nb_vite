@@ -50,20 +50,15 @@ defmodule NbVite.VitePlus do
   def install_command(project_dir \\ File.cwd!()) when is_binary(project_dir) do
     assets_dir = Path.join(project_dir, "assets")
 
-    case dependency_command(assets_dir) do
-      {"npm", ["install"]} -> "npm --prefix assets install"
-      {command, args} -> Enum.join([command | args], " ") |> then(&"cd assets && #{&1}")
-    end
-  end
+    case resolve(assets_dir) do
+      :global ->
+        "vp -C assets install"
 
-  @doc false
-  def dependency_command(assets_dir) when is_binary(assets_dir) do
-    cond do
-      File.exists?(Path.join(assets_dir, "pnpm-lock.yaml")) -> {"pnpm", ["install"]}
-      File.exists?(Path.join(assets_dir, "yarn.lock")) -> {"yarn", ["install"]}
-      File.exists?(Path.join(assets_dir, "bun.lock")) -> {"bun", ["install"]}
-      File.exists?(Path.join(assets_dir, "bun.lockb")) -> {"bun", ["install"]}
-      true -> {"npm", ["install"]}
+      {:local, executable} ->
+        "#{Path.relative_to(executable, project_dir)} -C assets install"
+
+      :npm_exec ->
+        "npm exec --yes --package=#{@vite_plus_package} -- vp -C assets install"
     end
   end
 end

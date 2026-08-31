@@ -2,10 +2,10 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
   @moduledoc """
   Integrates Vite+ into a Phoenix application.
 
-  Vite+ is intentionally installed as a development dependency and invoked
-  through its `vp` command. Unlike the legacy Bun integration, this module
-  does not add a runtime dependency to the Mix project. Dependency installation
-  stays with the package manager selected by the project's lockfile.
+  Vite+ is intentionally installed as an npm development dependency and
+  invoked through its `vp` command. Unlike the legacy Bun integration, this
+  module does not add a runtime dependency to the Mix project: Vite+ manages
+  the JavaScript runtime and package manager for the assets project.
   """
 
   @compile {:no_warn_undefined,
@@ -44,7 +44,7 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
   @doc "Configures the Phoenix development watcher to invoke Vite+."
   def setup_watcher(igniter), do: configure_watcher(igniter)
 
-  @doc "Returns the dependency-install command for a Phoenix assets project."
+  @doc "Runs the Vite+ package manager for a Phoenix assets project."
   def install_command do
     Elixir.NbVite.VitePlus.install_command()
   end
@@ -103,10 +103,10 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
       - The Phoenix dev watcher runs `mix nb_vite dev`, which resolves Vite+
         from the global CLI, assets/node_modules/.bin, or npm exec
       - Build and preview commands use the Vite+ toolchain
-      - Dependency installation uses the package manager selected by the lockfile
+      - npm 12.0.2 is the generated package-manager baseline
       - A global Vite+ install is optional: curl -fsSL https://vite.plus | bash
       - Install assets with: mix nb_vite.deps
-      - Without global or local `vp`, commands are bootstrapped via:
+      - Without global or local `vp`, the pinned 0.3.0 CLI is bootstrapped via:
         npm exec --yes --package=vite-plus@0.3.0 -- vp ...
       """
     )

@@ -663,6 +663,14 @@ if Code.ensure_loaded?(Igniter) do
           "vitest" => vite_plus_versions.vitest
         },
         "engines" => %{"node" => ">=20.19.0"},
+        "packageManager" => "npm@12.0.2",
+        "devEngines" => %{
+          "packageManager" => %{
+            "name" => "npm",
+            "version" => "12.0.2",
+            "onFail" => "download"
+          }
+        },
         "scripts" => scripts
       }
     end
@@ -670,7 +678,6 @@ if Code.ensure_loaded?(Igniter) do
     @doc "Merges Vite+ requirements into an existing assets package manifest."
     def merge_package_json(existing, generated) when is_map(existing) and is_map(generated) do
       existing
-      |> remove_legacy_generated_package_manager()
       |> Map.put_new("name", generated["name"])
       |> Map.put_new("version", generated["version"])
       |> Map.put("type", generated["type"])
@@ -680,32 +687,25 @@ if Code.ensure_loaded?(Igniter) do
       |> merge_json_object("overrides", generated)
       |> merge_json_object("engines", generated)
       |> merge_json_object("scripts", generated)
+      |> merge_package_manager(generated)
     end
 
-    defp remove_legacy_generated_package_manager(existing) do
-      legacy_dev_engines = %{
-        "packageManager" => %{
-          "name" => "npm",
-          "version" => "12.0.2",
-          "onFail" => "download"
-        }
-      }
+    defp merge_package_manager(existing, generated) do
+      package_manager = existing["packageManager"]
+      engine_name = get_in(existing, ["devEngines", "packageManager", "name"])
 
-      existing
-      |> then(fn manifest ->
-        if manifest["packageManager"] == "npm@12.0.2" do
-          Map.delete(manifest, "packageManager")
-        else
-          manifest
-        end
-      end)
-      |> then(fn manifest ->
-        if manifest["devEngines"] == legacy_dev_engines do
-          Map.delete(manifest, "devEngines")
-        else
-          manifest
-        end
-      end)
+      cond do
+        is_binary(package_manager) and not String.starts_with?(package_manager, "npm@") ->
+          existing
+
+        is_nil(package_manager) and is_binary(engine_name) and engine_name != "npm" ->
+          existing
+
+        true ->
+          existing
+          |> Map.put("packageManager", generated["packageManager"])
+          |> merge_json_object("devEngines", generated)
+      end
     end
 
     @doc false

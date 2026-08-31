@@ -109,7 +109,7 @@ defmodule Mix.Tasks.NbViteTest do
                     ]}
 
           assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
-                   "npm --prefix assets install"
+                   "npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets install"
         end)
       end)
     end
@@ -126,7 +126,7 @@ defmodule Mix.Tasks.NbViteTest do
                    {local_vp, ["dev"]}
 
           assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
-                   "npm --prefix assets install"
+                   "assets/node_modules/.bin/vp -C assets install"
         end)
       end)
     end
@@ -150,27 +150,10 @@ defmodule Mix.Tasks.NbViteTest do
                    {"vp", ["preview"]}
 
           assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
-                   "npm --prefix assets install"
+                   "vp -C assets install"
         after
           if old_path, do: System.put_env("PATH", old_path), else: System.delete_env("PATH")
         end
-      end)
-    end
-
-    test "selects the dependency installer from the assets lockfile" do
-      in_tmp(fn ->
-        assets_dir = Path.join(File.cwd!(), "assets")
-        File.mkdir_p!(assets_dir)
-
-        assert Elixir.NbVite.VitePlus.dependency_command(assets_dir) == {"npm", ["install"]}
-
-        File.write!(Path.join(assets_dir, "pnpm-lock.yaml"), "")
-
-        assert Elixir.NbVite.VitePlus.dependency_command(assets_dir) ==
-                 {"pnpm", ["install"]}
-
-        assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
-                 "cd assets && pnpm install"
       end)
     end
   end
@@ -211,8 +194,14 @@ defmodule Mix.Tasks.NbViteTest do
       assert manifest["overrides"]["vite"] == "npm:@voidzero-dev/vite-plus-core@0.3.0"
       assert manifest["overrides"]["vitest"] == "4.1.11"
       assert manifest["engines"]["node"] == ">=20.19.0"
-      refute Map.has_key?(manifest, "packageManager")
-      refute Map.has_key?(manifest, "devEngines")
+      assert manifest["packageManager"] == "npm@12.0.2"
+
+      assert manifest["devEngines"]["packageManager"] == %{
+               "name" => "npm",
+               "version" => "12.0.2",
+               "onFail" => "download"
+             }
+
       refute Map.has_key?(manifest, "workspaces")
       assert manifest["dependencies"]["phoenix"] == "^1.8.13"
       assert manifest["dependencies"]["phoenix_html"] == "^4.3.0"
@@ -267,24 +256,31 @@ defmodule Mix.Tasks.NbViteTest do
       assert migrated_again == migrated
     end
 
-    test "removes the legacy generated npm engine pin without touching custom package managers" do
+    test "upgrades npm projects to the npm 12 baseline" do
       generated = Install.package_json(features(typescript: true), "demo_app")
 
       legacy = %{
-        "packageManager" => "npm@12.0.2",
+        "packageManager" => "npm@11.19.0",
         "devEngines" => %{
+          "runtime" => %{"name" => "node", "onFail" => "error"},
           "packageManager" => %{
             "name" => "npm",
-            "version" => "12.0.2",
-            "onFail" => "download"
+            "version" => "11.19.0"
           }
         }
       }
 
       migrated = Install.merge_package_json(legacy, generated)
 
-      refute Map.has_key?(migrated, "packageManager")
-      refute Map.has_key?(migrated, "devEngines")
+      assert migrated["packageManager"] == "npm@12.0.2"
+
+      assert migrated["devEngines"]["packageManager"] ==
+               generated["devEngines"]["packageManager"]
+
+      assert migrated["devEngines"]["runtime"] == %{
+               "name" => "node",
+               "onFail" => "error"
+             }
     end
   end
 
