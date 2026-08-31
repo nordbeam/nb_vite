@@ -12,8 +12,8 @@ else
   task_vp_bin=("npm" "exec" "--yes" "--package=vite-plus@0.3.0" "--" "vp")
 fi
 
-# Vite+ delegates dependency installation to the package manager recorded by
-# the lockfile and uses the local vite-plus package for the pack configuration.
+# Vite+ installs with the repository's pinned npm 12.0.2 package-manager policy
+# and uses the local vite-plus package for the pack configuration.
 "${task_vp_bin[@]}" install --frozen-lockfile
 "${task_vp_bin[@]}" run build
 

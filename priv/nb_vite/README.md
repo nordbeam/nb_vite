@@ -26,9 +26,9 @@ The Phoenix installer pins `vite-plus@0.3.0`, aliases `vite` to
 `npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins the matching Vitest runtime.
 Install dependencies with `mix nb_vite.deps`. NbVite prefers global `vp`, then
 `assets/node_modules/.bin/vp`, and finally bootstraps the pinned CLI with
-`npm exec --yes --package=vite-plus@0.3.0 -- vp ...`. The npm CLI remains a
-supported fallback package manager; `@nordbeam/nb-vite` still comes directly
-from GitHub.
+`npm exec --yes --package=vite-plus@0.3.0 -- vp ...`. npm 12.0.2 is required
+for the npm bootstrap and generated assets projects; npm 11 is unsupported.
+`@nordbeam/nb-vite` still comes directly from GitHub.
 
 ## Usage
 

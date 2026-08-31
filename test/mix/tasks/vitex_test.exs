@@ -89,6 +89,36 @@ defmodule Mix.Tasks.NbViteTest do
         end
       end)
     end
+
+    test "raises when the Vite+ command fails" do
+      in_tmp(fn ->
+        without_global_vp(fn ->
+          File.mkdir_p!("assets/node_modules/.bin")
+          vp = Path.expand("assets/node_modules/.bin/vp")
+          File.write!(vp, "#!/bin/sh\nexit 7\n")
+          File.chmod!(vp, 0o755)
+
+          assert_raise RuntimeError, ~r/Vite\+ command failed with exit status 7/, fn ->
+            NbVite.run(["check"])
+          end
+        end)
+      end)
+    end
+
+    test "raises when Vite+ dependency installation fails" do
+      in_tmp(fn ->
+        without_global_vp(fn ->
+          File.mkdir_p!("assets/node_modules/.bin")
+          vp = Path.expand("assets/node_modules/.bin/vp")
+          File.write!(vp, "#!/bin/sh\nexit 9\n")
+          File.chmod!(vp, 0o755)
+
+          assert_raise RuntimeError,
+                       ~r/Vite\+ dependency installation failed with exit status 9/,
+                       fn -> Mix.Tasks.NbVite.Deps.run([]) end
+        end)
+      end)
+    end
   end
 
   describe "Vite+ command resolution" do
@@ -281,6 +311,19 @@ defmodule Mix.Tasks.NbViteTest do
                "name" => "node",
                "onFail" => "error"
              }
+    end
+
+    test "normalizes unversioned npm and malformed devEngines values" do
+      generated = Install.package_json(features(typescript: true), "demo_app")
+
+      migrated =
+        Install.merge_package_json(
+          %{"packageManager" => "npm", "devEngines" => "invalid"},
+          generated
+        )
+
+      assert migrated["packageManager"] == "npm@12.0.2"
+      assert migrated["devEngines"] == generated["devEngines"]
     end
   end
 

@@ -55,8 +55,9 @@
   "devEngines": {
     "packageManager": {
       "name": "npm",
-      "version": ">=10",
+      "version": "12.0.2",
       "onFail": "download"
     }
-  }
+  },
+  "packageManager": "npm@12.0.2"
 }

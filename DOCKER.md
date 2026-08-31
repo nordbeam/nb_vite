@@ -94,7 +94,7 @@ COPY assets assets
 # Change to assets directory and install Vite+ dependencies
 WORKDIR /app/assets
 
-# Vite+ delegates to the package manager selected by the assets lockfile.
+# The generated assets manifest pins npm 12.0.2 for Vite+.
 RUN vp install --frozen-lockfile
 
 # Build assets
@@ -167,8 +167,8 @@ CMD ["/app/bin/server"]
    - Build release
 
 3. **Reproducible Vite+ installs**: Commit the assets lockfile and use
-   `vp install --frozen-lockfile` in CI/Docker. Vite+ delegates to npm, pnpm,
-   or Yarn according to the project's lockfile/package-manager metadata.
+   `vp install --frozen-lockfile` in CI/Docker. Generated projects pin npm
+   12.0.2; npm 11 is unsupported.
 
 4. **Multi-Stage Builds**: Keep Node.js and build tools out of the final runtime image to minimize size.
 

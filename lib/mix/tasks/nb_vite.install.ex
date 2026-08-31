@@ -692,10 +692,16 @@ if Code.ensure_loaded?(Igniter) do
 
     defp merge_package_manager(existing, generated) do
       package_manager = existing["packageManager"]
-      engine_name = get_in(existing, ["devEngines", "packageManager", "name"])
+
+      engine_name =
+        case existing["devEngines"] do
+          %{"packageManager" => %{"name" => name}} when is_binary(name) -> name
+          _ -> nil
+        end
 
       cond do
-        is_binary(package_manager) and not String.starts_with?(package_manager, "npm@") ->
+        is_binary(package_manager) and package_manager != "npm" and
+            not String.starts_with?(package_manager, "npm@") ->
           existing
 
         is_nil(package_manager) and is_binary(engine_name) and engine_name != "npm" ->

@@ -59,7 +59,13 @@ defmodule Mix.Tasks.NbVite do
     # resolved exactly as they are for `vp dev`/`vp build`. When the global
     # CLI is unavailable, NbVite prefers the project's .bin entry and then
     # bootstraps the pinned CLI through npm exec.
-    Mix.shell().cmd(Elixir.NbVite.VitePlus.command(args, assets_dir), cd: assets_dir, env: env)
+    case Mix.shell().cmd(Elixir.NbVite.VitePlus.command(args, assets_dir),
+           cd: assets_dir,
+           env: env
+         ) do
+      0 -> :ok
+      status -> raise "Vite+ command failed with exit status #{status}"
+    end
   end
 
   defp node_env do
@@ -135,9 +141,12 @@ defmodule Mix.Tasks.NbVite.Deps do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    Mix.shell().cmd(
-      Elixir.NbVite.VitePlus.command(["install"], assets_dir),
-      cd: assets_dir
-    )
+    case Mix.shell().cmd(
+           Elixir.NbVite.VitePlus.command(["install"], assets_dir),
+           cd: assets_dir
+         ) do
+      0 -> :ok
+      status -> raise "Vite+ dependency installation failed with exit status #{status}"
+    end
   end
 end
