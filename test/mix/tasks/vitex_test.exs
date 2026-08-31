@@ -282,7 +282,13 @@ defmodule Mix.Tasks.NbViteTest do
         },
         "overrides" => %{"custom-tool" => "1.0.1"},
         "packageManager" => "pnpm@11.24.0",
-        "workspaces" => ["packages/*"]
+        "workspaces" => [
+          "../deps/phoenix",
+          "packages/*",
+          "../deps/phoenix_html",
+          "shared/*",
+          "../deps/phoenix_live_view"
+        ]
       }
 
       migrated = Install.merge_package_json(existing, generated)
@@ -298,9 +304,43 @@ defmodule Mix.Tasks.NbViteTest do
       assert migrated["overrides"]["vitest"] == "4.1.11"
       assert migrated["packageManager"] == "pnpm@11.24.0"
 
-      assert migrated["workspaces"] == ["packages/*"]
+      assert migrated["workspaces"] == ["packages/*", "shared/*"]
 
       assert migrated_again == migrated
+    end
+
+    test "removes the workspaces key when it contains only legacy Phoenix dependencies" do
+      generated = Install.package_json(features(typescript: true), "demo_app")
+
+      existing = %{
+        "workspaces" => [
+          "../deps/phoenix",
+          "../deps/phoenix_html",
+          "../deps/phoenix_live_view"
+        ]
+      }
+
+      migrated = Install.merge_package_json(existing, generated)
+
+      refute Map.has_key?(migrated, "workspaces")
+    end
+
+    test "removes legacy Phoenix entries from object workspaces while preserving custom config" do
+      generated = Install.package_json(features(typescript: true), "demo_app")
+
+      existing = %{
+        "workspaces" => %{
+          "packages" => ["../deps/phoenix", "packages/*", "../deps/phoenix_live_view"],
+          "nohoist" => ["custom-package"]
+        }
+      }
+
+      migrated = Install.merge_package_json(existing, generated)
+
+      assert migrated["workspaces"] == %{
+               "packages" => ["packages/*"],
+               "nohoist" => ["custom-package"]
+             }
     end
 
     test "upgrades npm projects to the npm 12 baseline" do

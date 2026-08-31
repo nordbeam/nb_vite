@@ -56,6 +56,11 @@ the application-declared GitHub packages and `allow-remote=all` for registry
 packages such as Tailwind that resolve platform artifacts through remote
 tarballs. The Nordbeam package source remains GitHub.
 
+When migrating an existing `assets/package.json`, the installer removes the
+legacy Phoenix workspaces `../deps/phoenix`, `../deps/phoenix_html`, and
+`../deps/phoenix_live_view`. Any custom workspace entries and workspace
+configuration are preserved.
+
 **Benefits of using the package:**
 - Standard package dependency management through Vite+
 - Git commit pinning through the generated lockfile

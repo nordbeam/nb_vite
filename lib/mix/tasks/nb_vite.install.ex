@@ -9,6 +9,7 @@ if Code.ensure_loaded?(Igniter) do
     3. Adds the Vite+ watcher to the development configuration
     4. Updates the root layout template to use Vite helpers
     5. Creates or updates asset files for Vite
+    6. Removes legacy Phoenix dependency workspaces while preserving custom workspaces
 
     ## Usage
 
@@ -723,7 +724,54 @@ if Code.ensure_loaded?(Igniter) do
       |> merge_json_object("engines", generated)
       |> merge_json_object("scripts", generated)
       |> merge_package_manager(generated)
+      |> remove_legacy_phoenix_workspaces()
     end
+
+    @legacy_phoenix_workspaces ~w(
+      ../deps/phoenix
+      ../deps/phoenix_html
+      ../deps/phoenix_live_view
+    )
+
+    defp remove_legacy_phoenix_workspaces(package_json) do
+      case Map.get(package_json, "workspaces") do
+        workspaces when is_list(workspaces) ->
+          update_workspace_list(package_json, workspaces)
+
+        %{"packages" => packages} = workspaces when is_list(packages) ->
+          update_workspace_object(package_json, workspaces, packages)
+
+        _ ->
+          package_json
+      end
+    end
+
+    defp update_workspace_list(package_json, workspaces) do
+      remaining = Enum.reject(workspaces, &legacy_phoenix_workspace?/1)
+
+      if remaining == [] do
+        Map.delete(package_json, "workspaces")
+      else
+        Map.put(package_json, "workspaces", remaining)
+      end
+    end
+
+    defp update_workspace_object(package_json, workspaces, packages) do
+      remaining = Enum.reject(packages, &legacy_phoenix_workspace?/1)
+
+      cond do
+        remaining == [] and map_size(workspaces) == 1 ->
+          Map.delete(package_json, "workspaces")
+
+        remaining == [] ->
+          Map.put(package_json, "workspaces", Map.delete(workspaces, "packages"))
+
+        true ->
+          Map.put(package_json, "workspaces", Map.put(workspaces, "packages", remaining))
+      end
+    end
+
+    defp legacy_phoenix_workspace?(workspace), do: workspace in @legacy_phoenix_workspaces
 
     defp merge_package_manager(existing, generated) do
       package_manager = existing["packageManager"]
