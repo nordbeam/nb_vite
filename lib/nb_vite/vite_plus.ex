@@ -32,6 +32,18 @@ defmodule NbVite.VitePlus do
   end
 
   @doc false
+  def execute({executable, args}, options \\ [])
+      when is_binary(executable) and is_list(args) and is_list(options) do
+    options =
+      options
+      |> Keyword.put_new(:stderr_to_stdout, true)
+      |> Keyword.put_new(:into, %Mix.Shell{callback: &IO.write/1})
+
+    {_, status} = System.cmd(executable, args, options)
+    status
+  end
+
+  @doc false
   def resolve(assets_dir) when is_binary(assets_dir) do
     cond do
       System.find_executable("vp") ->
