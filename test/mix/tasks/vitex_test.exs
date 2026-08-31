@@ -189,11 +189,27 @@ defmodule Mix.Tasks.NbViteTest do
   end
 
   describe "Vite+ package manifest" do
+    test "adds the npm 12 root git allowlist without dropping project config" do
+      existing = "registry=https://registry.npmjs.org\nstrict-peer-deps=true\n"
+
+      migrated = Install.merge_npmrc(existing)
+
+      assert migrated == existing <> "allow-git=root\n"
+      assert Install.merge_npmrc(migrated) == migrated
+    end
+
+    test "replaces incompatible npm git policies and preserves comments" do
+      existing = "# allow-git=none\nallow-git = none\nfund=false\n"
+
+      assert Install.merge_npmrc(existing) ==
+               "# allow-git=none\nallow-git=root\nfund=false\n"
+    end
+
     test "maps local nb_vite Mix dependencies to the GitHub package directory" do
       source =
         Install.npm_source_from_dep_declaration(
           "{:nb_vite, [path: \"../nb_vite\", override: true]}",
-          "github:nordbeam/nb_vite"
+          "git+https://github.com/nordbeam/nb_vite.git"
         )
 
       assert source == "file:#{Path.expand("../nb_vite/priv/nb_vite")}"
@@ -203,10 +219,10 @@ defmodule Mix.Tasks.NbViteTest do
       source =
         Install.npm_source_from_dep_declaration(
           "{:nb_vite, [github: \"nordbeam/nb_vite\", ref: \"abc123\"]}",
-          "github:nordbeam/nb_vite"
+          "git+https://github.com/nordbeam/nb_vite.git"
         )
 
-      assert source == "github:nordbeam/nb_vite#abc123"
+      assert source == "git+https://github.com/nordbeam/nb_vite.git#abc123"
     end
 
     test "builds a fresh manifest with the pinned Vite+ toolchain" do
@@ -218,7 +234,7 @@ defmodule Mix.Tasks.NbViteTest do
       assert manifest["devDependencies"]["vite"] == "npm:@voidzero-dev/vite-plus-core@0.3.0"
 
       assert manifest["devDependencies"]["@nordbeam/nb-vite"] ==
-               "github:nordbeam/nb_vite"
+               "git+https://github.com/nordbeam/nb_vite.git"
 
       assert manifest["devDependencies"]["typescript"] == "^5.9.3"
       assert manifest["overrides"]["vite"] == "npm:@voidzero-dev/vite-plus-core@0.3.0"

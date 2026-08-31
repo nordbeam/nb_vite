@@ -63,6 +63,7 @@ if Code.ensure_loaded?(Igniter) do
       |> setup_html_helpers()
       |> create_vite_config()
       |> update_package_json()
+      |> update_npmrc()
       |> remove_old_watchers()
       |> update_root_layout()
       |> setup_assets()
@@ -584,6 +585,32 @@ if Code.ensure_loaded?(Igniter) do
       |> queue_vite_plus_install()
     end
 
+    @doc "Allows npm 12 to install the first-party GitHub package declared at the project root."
+    def update_npmrc(igniter) do
+      path = "assets/.npmrc"
+
+      if Igniter.exists?(igniter, path) do
+        Igniter.update_file(igniter, path, fn source ->
+          content = Rewrite.Source.get(source, :content)
+          Rewrite.Source.update(source, :content, merge_npmrc(content))
+        end)
+      else
+        Igniter.create_new_file(igniter, path, "allow-git=root\n", on_exists: :skip)
+      end
+    end
+
+    @doc false
+    def merge_npmrc(content) when is_binary(content) do
+      allow_git_pattern = ~r/^(?!\s*[#;])\s*allow-git\s*=.*$/m
+
+      if Regex.match?(allow_git_pattern, content) do
+        Regex.replace(allow_git_pattern, content, "allow-git=root")
+      else
+        separator = if content == "" or String.ends_with?(content, "\n"), do: "", else: "\n"
+        content <> separator <> "allow-git=root\n"
+      end
+    end
+
     defp detect_project_features(igniter) do
       {igniter, has_tailwind} = detect_tailwind(igniter)
       {igniter, has_topbar} = detect_topbar(igniter)
@@ -718,10 +745,13 @@ if Code.ensure_loaded?(Igniter) do
     def nb_vite_client_package_source(igniter) do
       case Igniter.Project.Deps.get_dep(igniter, :nb_vite) do
         {:ok, dep_declaration} when is_binary(dep_declaration) ->
-          npm_source_from_dep_declaration(dep_declaration, "github:nordbeam/nb_vite")
+          npm_source_from_dep_declaration(
+            dep_declaration,
+            "git+https://github.com/nordbeam/nb_vite.git"
+          )
 
         _ ->
-          "github:nordbeam/nb_vite"
+          "git+https://github.com/nordbeam/nb_vite.git"
       end
     end
 
@@ -749,7 +779,7 @@ if Code.ensure_loaded?(Igniter) do
           "file:#{opts[:path] |> Path.expand() |> Path.join("priv/nb_vite")}"
 
         is_binary(opts[:github]) ->
-          "github:#{opts[:github]}#{git_ref_suffix(opts)}"
+          github_npm_source(opts[:github], git_ref_suffix(opts))
 
         is_binary(opts[:git]) ->
           "#{opts[:git]}#{git_ref_suffix(opts)}"
@@ -764,6 +794,11 @@ if Code.ensure_loaded?(Igniter) do
         ref when is_binary(ref) and ref != "" -> "##{ref}"
         _ -> ""
       end
+    end
+
+    defp github_npm_source(repository, suffix) do
+      repository = String.trim_trailing(repository, ".git")
+      "git+https://github.com/#{repository}.git#{suffix}"
     end
 
     defp merge_json_object(package_json, key, generated) do
@@ -813,7 +848,7 @@ if Code.ensure_loaded?(Igniter) do
       dev_deps = %{
         "vite" => vite_plus_versions.vite_core,
         "vite-plus" => vite_plus_versions.vite_plus,
-        "@nordbeam/nb-vite" => "github:nordbeam/nb_vite",
+        "@nordbeam/nb-vite" => "git+https://github.com/nordbeam/nb_vite.git",
         "@types/phoenix" => "^1.6.7"
       }
 

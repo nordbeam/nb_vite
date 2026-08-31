@@ -17,9 +17,9 @@ Vite plugin for Phoenix Framework with SSR support and nb_routes auto-regenerati
 ```bash
 # An optional global Vite+ CLI (macOS/Linux), then add the plugin from your Phoenix app.
 curl -fsSL https://vite.plus | bash
-vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
+vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
 # Without a global CLI, use the pinned bootstrap instead:
-# npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
+# npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
 ```
 
 The Phoenix installer pins `vite-plus@0.3.0`, aliases `vite` to
@@ -28,6 +28,8 @@ Install dependencies with `mix nb_vite.deps`. NbVite prefers global `vp`, then
 `assets/node_modules/.bin/vp`, and finally bootstraps the pinned CLI with
 `npm exec --yes --package=vite-plus@0.3.0 -- vp ...`. npm 12.0.2 is required
 for the npm bootstrap and generated assets projects; npm 11 is unsupported.
+The installer sets `allow-git=root` in `assets/.npmrc` so npm 12 can fetch the
+declared first-party package without allowing transitive git dependencies.
 `@nordbeam/nb-vite` still comes directly from GitHub.
 
 ## Usage

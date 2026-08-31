@@ -118,7 +118,7 @@ The tag push will automatically trigger the publishing workflow.
 4. **Formatting**: Code must be properly formatted (`mix format`)
 5. **No Auto-increment**: Versions are NOT automatically incremented - releases are intentional
 6. **No npm Publish**: `@nordbeam/nb-vite` is installed from
-   `github:nordbeam/nb_vite`; do not run `npm publish`
+   `git+https://github.com/nordbeam/nb_vite.git`; do not run `npm publish`
 
 ## Troubleshooting
 
