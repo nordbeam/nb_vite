@@ -2802,24 +2802,39 @@ function resolvePhoenixColocatedAliases() {
 	const aliases = {};
 	const appName = getPhoenixAppName();
 	if (!appName) return aliases;
-	if (!isPhoenix18()) return aliases;
-	const buildPath = process.env.PHX_BUILD_PATH || path.resolve(process.cwd(), "../_build/dev");
+	const projectRoot = findPhoenixProjectRoot();
+	const mixEnv = process.env.MIX_ENV || "dev";
+	const defaultBuildPath = projectRoot ? path.join(projectRoot, "_build", mixEnv) : path.resolve(process.cwd(), `../_build/${mixEnv}`);
+	const buildPath = process.env.PHX_BUILD_PATH ? path.resolve(process.env.PHX_BUILD_PATH) : defaultBuildPath;
 	const colocatedPath = path.resolve(buildPath, `phoenix-colocated/${appName}`);
 	aliases[`phoenix-colocated/${appName}`] = colocatedPath;
 	if (process.env.DEBUG || process.env.VERBOSE) console.log(import_picocolors.default.dim(`Phoenix colocated alias: phoenix-colocated/${appName} -> ${colocatedPath}`));
 	return aliases;
 }
 /**
-* Get the Phoenix app name from environment variable
+* Find the Phoenix project containing the current frontend directory.
 */
-function getPhoenixAppName() {
-	return process.env.PHX_APP_NAME;
+function findPhoenixProjectRoot(startDirectory = process.cwd()) {
+	let directory = path.resolve(startDirectory);
+	while (true) {
+		if (fs.existsSync(path.join(directory, "mix.exs"))) return directory;
+		const parent = path.dirname(directory);
+		if (parent === directory) return;
+		directory = parent;
+	}
 }
 /**
-* Check if Phoenix 1.8 is being used
+* Get the Phoenix app name from the watcher environment or mix.exs.
 */
-function isPhoenix18() {
-	return process.env.PHX_VERSION === "1.8";
+function getPhoenixAppName() {
+	if (process.env.PHX_APP_NAME) return process.env.PHX_APP_NAME;
+	const projectRoot = findPhoenixProjectRoot();
+	if (!projectRoot) return;
+	try {
+		return fs.readFileSync(path.join(projectRoot, "mix.exs"), "utf8").match(/\bapp:\s*:([a-zA-Z0-9_]+)/)?.[1];
+	} catch {
+		return;
+	}
 }
 /**
 * Resolve aliases for Phoenix JavaScript libraries.

@@ -91,6 +91,90 @@ defmodule Mix.Tasks.NbViteTest do
     end
   end
 
+  describe "Vite+ command resolution" do
+    test "uses the pinned npm exec bootstrap when no vp executable is available" do
+      in_tmp(fn ->
+        without_global_vp(fn ->
+          assets_dir = Path.join(File.cwd!(), "assets")
+
+          assert Elixir.NbVite.VitePlus.command(["build"], assets_dir) ==
+                   {"npm",
+                    [
+                      "exec",
+                      "--yes",
+                      "--package=vite-plus@0.3.0",
+                      "--",
+                      "vp",
+                      "build"
+                    ]}
+
+          assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
+                   "npm --prefix assets install"
+        end)
+      end)
+    end
+
+    test "prefers the project-local vp executable over npm exec" do
+      in_tmp(fn ->
+        without_global_vp(fn ->
+          assets_dir = Path.join(File.cwd!(), "assets")
+          local_vp = Path.join([assets_dir, "node_modules", ".bin", "vp"])
+          File.mkdir_p!(Path.dirname(local_vp))
+          File.write!(local_vp, "#!/bin/sh\n")
+
+          assert Elixir.NbVite.VitePlus.command(["dev"], assets_dir) ==
+                   {local_vp, ["dev"]}
+
+          assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
+                   "npm --prefix assets install"
+        end)
+      end)
+    end
+
+    test "prefers the global vp executable over the project-local executable" do
+      in_tmp(fn ->
+        bin_dir = Path.join(File.cwd!(), "bin")
+        assets_dir = Path.join(File.cwd!(), "assets")
+        global_vp = Path.join(bin_dir, "vp")
+        local_vp = Path.join([assets_dir, "node_modules", ".bin", "vp"])
+        File.mkdir_p!(Path.dirname(global_vp))
+        File.mkdir_p!(Path.dirname(local_vp))
+        File.write!(global_vp, "#!/bin/sh\n")
+        File.write!(local_vp, "#!/bin/sh\n")
+        File.chmod!(global_vp, 0o755)
+        old_path = System.get_env("PATH")
+        System.put_env("PATH", bin_dir)
+
+        try do
+          assert Elixir.NbVite.VitePlus.command(["preview"], assets_dir) ==
+                   {"vp", ["preview"]}
+
+          assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
+                   "npm --prefix assets install"
+        after
+          if old_path, do: System.put_env("PATH", old_path), else: System.delete_env("PATH")
+        end
+      end)
+    end
+
+    test "selects the dependency installer from the assets lockfile" do
+      in_tmp(fn ->
+        assets_dir = Path.join(File.cwd!(), "assets")
+        File.mkdir_p!(assets_dir)
+
+        assert Elixir.NbVite.VitePlus.dependency_command(assets_dir) == {"npm", ["install"]}
+
+        File.write!(Path.join(assets_dir, "pnpm-lock.yaml"), "")
+
+        assert Elixir.NbVite.VitePlus.dependency_command(assets_dir) ==
+                 {"pnpm", ["install"]}
+
+        assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
+                 "cd assets && pnpm install"
+      end)
+    end
+  end
+
   describe "Vite+ package manifest" do
     test "maps local nb_vite Mix dependencies to the GitHub package directory" do
       source =
@@ -127,21 +211,24 @@ defmodule Mix.Tasks.NbViteTest do
       assert manifest["overrides"]["vite"] == "npm:@voidzero-dev/vite-plus-core@0.3.0"
       assert manifest["overrides"]["vitest"] == "4.1.11"
       assert manifest["engines"]["node"] == ">=20.19.0"
-      assert manifest["packageManager"] == "npm@12.0.2"
-      assert manifest["devEngines"]["packageManager"]["name"] == "npm"
+      refute Map.has_key?(manifest, "packageManager")
+      refute Map.has_key?(manifest, "devEngines")
       refute Map.has_key?(manifest, "workspaces")
       assert manifest["dependencies"]["phoenix"] == "^1.8.13"
       assert manifest["dependencies"]["phoenix_html"] == "^4.3.0"
       assert manifest["dependencies"]["phoenix_live_view"] == "^1.2.11"
       assert manifest["scripts"]["dev"] == "vp dev"
       assert manifest["scripts"]["build"] == "vp build"
-      assert manifest["scripts"]["check"] == "vp check && tsc --noEmit"
+      assert manifest["scripts"]["check"] == "vp check"
+      assert manifest["scripts"]["check:fix"] == "vp check --fix"
+      assert manifest["scripts"]["types:check"] == "tsc --noEmit"
     end
 
     test "keeps the JavaScript-only check script on Vite+" do
       manifest = Install.package_json(features(typescript: false), "demo_app")
 
       assert manifest["scripts"]["check"] == "vp check"
+      refute Map.has_key?(manifest["scripts"], "types:check")
     end
 
     test "upgrades an existing manifest without dropping app configuration" do
@@ -179,6 +266,26 @@ defmodule Mix.Tasks.NbViteTest do
 
       assert migrated_again == migrated
     end
+
+    test "removes the legacy generated npm engine pin without touching custom package managers" do
+      generated = Install.package_json(features(typescript: true), "demo_app")
+
+      legacy = %{
+        "packageManager" => "npm@12.0.2",
+        "devEngines" => %{
+          "packageManager" => %{
+            "name" => "npm",
+            "version" => "12.0.2",
+            "onFail" => "download"
+          }
+        }
+      }
+
+      migrated = Install.merge_package_json(legacy, generated)
+
+      refute Map.has_key?(migrated, "packageManager")
+      refute Map.has_key?(migrated, "devEngines")
+    end
   end
 
   describe "Vite+ Vite config migration" do
@@ -201,6 +308,7 @@ defmodule Mix.Tasks.NbViteTest do
       assert migrated =~ "sortPackageJson: true"
       refute migrated =~ "from 'vite';"
       assert Install.migrate_vite_config_content(migrated, %{typescript: true}) == migrated
+      assert Install.vite_plus_config?(migrated)
     end
 
     test "leaves complex plugin arrays intact while migrating the import" do
@@ -243,6 +351,17 @@ defmodule Mix.Tasks.NbViteTest do
       File.cd!(tmp_path, fun)
     after
       File.rm_rf!(tmp_path)
+    end
+  end
+
+  defp without_global_vp(fun) do
+    old_path = System.get_env("PATH")
+    System.put_env("PATH", "")
+
+    try do
+      fun.()
+    after
+      if old_path, do: System.put_env("PATH", old_path), else: System.delete_env("PATH")
     end
   end
 end

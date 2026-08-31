@@ -34,19 +34,25 @@ The Vite plugin is installed directly from GitHub. Nordbeam does not publish it
 to the npm registry:
 
 ```bash
-# Install the Vite+ CLI once (macOS/Linux)
+# An optional global Vite+ CLI (macOS/Linux)
 curl -fsSL https://vite.plus | bash
 
 # From the Phoenix project root, add the plugin to assets/
 vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
+# Without a global CLI, use the pinned bootstrap instead:
+# npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
 ```
 
 Vite+ is the supported project workflow. The installer adds
 `vite-plus@0.3.0`, aliases `vite` to
 `npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins Vite+'s Vitest runtime.
-For an existing app, run `vp -C assets install` after migrating its manifest.
-The npm CLI remains a compatible fallback package manager for projects that
-cannot install Vite+; the Nordbeam package source is still GitHub.
+The installer and `mix nb_vite` tasks do not require a global CLI: they prefer
+global `vp`, then `assets/node_modules/.bin/vp`, and finally bootstrap the
+pinned CLI with `npm exec --yes --package=vite-plus@0.3.0 -- vp ...`.
+For an existing app, run `mix nb_vite.deps` after migrating its manifest.
+The task uses the package manager selected by the assets lockfile (npm by
+default), avoiding the npm engine pins that `vp install` adds in Vite+ 0.3.
+The Nordbeam package source remains GitHub.
 
 **Benefits of using the package:**
 - Standard package dependency management through Vite+
@@ -71,8 +77,9 @@ export default defineConfig({
 ```
 
 Use `vp dev`, `vp build`, `vp preview`, and `vp check` from `assets/` (or
-prefix them with `vp -C assets`). Use `vp run <script>` when you explicitly
-want to invoke a `package.json` script.
+prefix them with `vp -C assets`) when the global or local CLI is available.
+The equivalent Mix tasks resolve the CLI automatically. Use `vp run <script>`
+when you explicitly want to invoke a `package.json` script.
 
 **Legacy file reference:** The plugin is also bundled in `priv/static/nb_vite/`
 for projects that prefer file references, but the Vite+ + GitHub dependency

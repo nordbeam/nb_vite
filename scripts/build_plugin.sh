@@ -4,19 +4,18 @@ set -euo pipefail
 echo "Building Phoenix Vite plugin with Vite+..."
 
 if command -v vp >/dev/null 2>&1; then
-  task_vp_bin="vp"
+  task_vp_bin=("vp")
 elif [[ -x "node_modules/.bin/vp" ]]; then
-  task_vp_bin="node_modules/.bin/vp"
+  task_vp_bin=("node_modules/.bin/vp")
 else
-  echo "Vite+ is required to build nb_vite. Run npm install or install it globally with:"
-  echo "  curl -fsSL https://vite.plus | bash"
-  exit 1
+  echo "No global or project-local vp found; bootstrapping Vite+ 0.3.0 with npm exec."
+  task_vp_bin=("npm" "exec" "--yes" "--package=vite-plus@0.3.0" "--" "vp")
 fi
 
 # Vite+ delegates dependency installation to the package manager recorded by
 # the lockfile and uses the local vite-plus package for the pack configuration.
-"$task_vp_bin" install --frozen-lockfile
-"$task_vp_bin" run build
+"${task_vp_bin[@]}" install --frozen-lockfile
+"${task_vp_bin[@]}" run build
 
 # Keep the legacy file-reference distribution in sync for applications that
 # have not migrated to the GitHub package yet.

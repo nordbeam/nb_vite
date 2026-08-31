@@ -26,10 +26,6 @@ defmodule Mix.Tasks.NbVite do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    unless System.find_executable("vp") do
-      Mix.raise("Vite+ (vp) was not found on PATH. Install it from https://vite.plus")
-    end
-
     # Pass through important environment variables
     env = [
       {"NODE_ENV", node_env()},
@@ -60,8 +56,10 @@ defmodule Mix.Tasks.NbVite do
 
     # Vite+ owns the Node.js runtime and package-manager integration. Run it
     # from the assets directory so its local vite-plus package and config are
-    # resolved exactly as they are for `vp dev`/`vp build`.
-    Mix.shell().cmd({"vp", args}, cd: assets_dir, env: env)
+    # resolved exactly as they are for `vp dev`/`vp build`. When the global
+    # CLI is unavailable, NbVite prefers the project's .bin entry and then
+    # bootstraps the pinned CLI through npm exec.
+    Mix.shell().cmd(Elixir.NbVite.VitePlus.command(args, assets_dir), cd: assets_dir, env: env)
   end
 
   defp node_env do
@@ -122,8 +120,10 @@ defmodule Mix.Tasks.NbVite.Deps do
 
       $ mix nb_vite.deps
 
-  Vite+ detects the package manager from the assets lockfile and invokes the
-  local `vite-plus` toolchain.
+  Uses the package manager selected by the assets lockfile. Vite+ remains the
+  project toolchain for development, checks, tests, and builds, while package
+  installation stays with npm, pnpm, Yarn, or Bun and does not rewrite the
+  manifest with Vite+ CLI engine pins.
   """
   @shortdoc "Installs JavaScript dependencies using Vite+"
 
@@ -137,10 +137,6 @@ defmodule Mix.Tasks.NbVite.Deps do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    unless System.find_executable("vp") do
-      Mix.raise("Vite+ (vp) was not found on PATH. Install it from https://vite.plus")
-    end
-
-    Mix.shell().cmd({"vp", ["install"]}, cd: assets_dir)
+    Mix.shell().cmd(Elixir.NbVite.VitePlus.dependency_command(assets_dir), cd: assets_dir)
   end
 end

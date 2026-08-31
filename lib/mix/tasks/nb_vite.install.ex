@@ -212,13 +212,26 @@ if Code.ensure_loaded?(Igniter) do
         content = Rewrite.Source.get(source, :content)
         migrated = migrate_vite_config_content(content, options)
 
-        if migrated == content do
-          {:notice,
-           "#{path} was left unchanged because its structure was not recognized. Run `vp migrate --no-interactive` or apply the Vite+ import and metadata changes manually."}
-        else
-          Rewrite.Source.update(source, :content, migrated)
+        cond do
+          migrated != content ->
+            Rewrite.Source.update(source, :content, migrated)
+
+          vite_plus_config?(content) ->
+            source
+
+          true ->
+            {:notice,
+             "#{path} was left unchanged because its structure was not recognized. Run `vp migrate --no-interactive` or apply the Vite+ import and metadata changes manually."}
         end
       end)
+    end
+
+    @doc false
+    def vite_plus_config?(content) when is_binary(content) do
+      Regex.match?(
+        ~r/import\s*\{[^}]*\bdefineConfig\b[^}]*\}\s*from\s*['"]vite-plus['"]/,
+        content
+      )
     end
 
     @doc "Conservatively migrates a JavaScript/TypeScript Vite config to Vite+."
@@ -626,19 +639,23 @@ if Code.ensure_loaded?(Igniter) do
     def package_json(features, app_name) when is_map(features) and is_binary(app_name) do
       vite_plus_versions = VitePlusIntegration.versions()
 
+      scripts =
+        %{
+          "dev" => "vp dev",
+          "build" => "vp build",
+          "preview" => "vp preview",
+          "check" => "vp check",
+          "check:fix" => "vp check --fix",
+          "types:check" => if(features.typescript, do: "tsc --noEmit", else: nil),
+          "test" => "vp test --passWithNoTests"
+        }
+        |> Map.reject(fn {_key, value} -> is_nil(value) end)
+
       %{
         "name" => app_name,
         "version" => "0.0.0",
         "type" => "module",
         "private" => true,
-        "packageManager" => "npm@12.0.2",
-        "devEngines" => %{
-          "packageManager" => %{
-            "name" => "npm",
-            "version" => "12.0.2",
-            "onFail" => "download"
-          }
-        },
         "dependencies" => build_dependencies(features),
         "devDependencies" => build_dev_dependencies(features),
         "overrides" => %{
@@ -646,34 +663,49 @@ if Code.ensure_loaded?(Igniter) do
           "vitest" => vite_plus_versions.vitest
         },
         "engines" => %{"node" => ">=20.19.0"},
-        "scripts" => %{
-          "dev" => "vp dev",
-          "build" => "vp build",
-          "preview" => "vp preview",
-          "check" =>
-            if(features.typescript,
-              do: "vp check && tsc --noEmit",
-              else: "vp check"
-            ),
-          "test" => "vp test --passWithNoTests"
-        }
+        "scripts" => scripts
       }
     end
 
     @doc "Merges Vite+ requirements into an existing assets package manifest."
     def merge_package_json(existing, generated) when is_map(existing) and is_map(generated) do
       existing
+      |> remove_legacy_generated_package_manager()
       |> Map.put_new("name", generated["name"])
       |> Map.put_new("version", generated["version"])
       |> Map.put("type", generated["type"])
       |> Map.put_new("private", generated["private"])
-      |> Map.put_new("packageManager", generated["packageManager"])
-      |> Map.put_new("devEngines", generated["devEngines"])
       |> merge_json_object("dependencies", generated)
       |> merge_json_object("devDependencies", generated)
       |> merge_json_object("overrides", generated)
       |> merge_json_object("engines", generated)
       |> merge_json_object("scripts", generated)
+    end
+
+    defp remove_legacy_generated_package_manager(existing) do
+      legacy_dev_engines = %{
+        "packageManager" => %{
+          "name" => "npm",
+          "version" => "12.0.2",
+          "onFail" => "download"
+        }
+      }
+
+      existing
+      |> then(fn manifest ->
+        if manifest["packageManager"] == "npm@12.0.2" do
+          Map.delete(manifest, "packageManager")
+        else
+          manifest
+        end
+      end)
+      |> then(fn manifest ->
+        if manifest["devEngines"] == legacy_dev_engines do
+          Map.delete(manifest, "devEngines")
+        else
+          manifest
+        end
+      end)
     end
 
     @doc false
@@ -823,14 +855,10 @@ if Code.ensure_loaded?(Igniter) do
     defp maybe_update_daisyui_imports(igniter, false), do: igniter
 
     defp queue_vite_plus_install(igniter) do
-      if System.find_executable("vp") do
-        Igniter.add_task(igniter, "cmd", [VitePlusIntegration.install_command()])
-      else
-        Igniter.add_notice(
-          igniter,
-          "Vite+ was not found on PATH, so asset installation was skipped. Run `vp -C assets install` after installing Vite+."
-        )
-      end
+      # Keep installation working on machines without a global `vp`. The
+      # command resolves global and project-local CLIs first, then falls back
+      # to the pinned npm exec bootstrap.
+      Igniter.add_task(igniter, "cmd", [VitePlusIntegration.install_command()])
     end
 
     def remove_old_watchers(igniter) do

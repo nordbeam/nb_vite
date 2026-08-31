@@ -1865,13 +1865,15 @@ function resolvePhoenixColocatedAliases(): Record<string, string> {
     return aliases;
   }
 
-  // Check if Phoenix 1.8 is being used
-  if (!isPhoenix18()) {
-    return aliases;
-  }
-
   // Build the colocated path
-  const buildPath = process.env.PHX_BUILD_PATH || path.resolve(process.cwd(), '../_build/dev');
+  const projectRoot = findPhoenixProjectRoot();
+  const mixEnv = process.env.MIX_ENV || 'dev';
+  const defaultBuildPath = projectRoot
+    ? path.join(projectRoot, '_build', mixEnv)
+    : path.resolve(process.cwd(), `../_build/${mixEnv}`);
+  const buildPath = process.env.PHX_BUILD_PATH
+    ? path.resolve(process.env.PHX_BUILD_PATH)
+    : defaultBuildPath;
   const colocatedPath = path.resolve(buildPath, `phoenix-colocated/${appName}`);
 
   // Add the alias
@@ -1887,17 +1889,44 @@ function resolvePhoenixColocatedAliases(): Record<string, string> {
 }
 
 /**
- * Get the Phoenix app name from environment variable
+ * Find the Phoenix project containing the current frontend directory.
  */
-function getPhoenixAppName(): string | undefined {
-  return process.env.PHX_APP_NAME;
+function findPhoenixProjectRoot(startDirectory = process.cwd()): string | undefined {
+  let directory = path.resolve(startDirectory);
+
+  while (true) {
+    if (fs.existsSync(path.join(directory, 'mix.exs'))) {
+      return directory;
+    }
+
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      return undefined;
+    }
+
+    directory = parent;
+  }
 }
 
 /**
- * Check if Phoenix 1.8 is being used
+ * Get the Phoenix app name from the watcher environment or mix.exs.
  */
-function isPhoenix18(): boolean {
-  return process.env.PHX_VERSION === '1.8';
+function getPhoenixAppName(): string | undefined {
+  if (process.env.PHX_APP_NAME) {
+    return process.env.PHX_APP_NAME;
+  }
+
+  const projectRoot = findPhoenixProjectRoot();
+  if (!projectRoot) {
+    return undefined;
+  }
+
+  try {
+    const mixProject = fs.readFileSync(path.join(projectRoot, 'mix.exs'), 'utf8');
+    return mixProject.match(/\bapp:\s*:([a-zA-Z0-9_]+)/)?.[1];
+  } catch {
+    return undefined;
+  }
 }
 
 /**

@@ -26,11 +26,20 @@ mix igniter.install nb_vite --typescript
 ```
 
 The installer configures the Vite+ watcher, `vite-plus@0.3.0`, the Vite core
-alias/override, and Vite+ package scripts. Install the global CLI if needed:
+alias/override, and Vite+ package scripts. Install the global CLI if desired
+for direct `vp` commands:
 
 ```bash
 curl -fsSL https://vite.plus | bash
 vp -C assets install
+```
+
+The installer does not require a global CLI. `mix nb_vite.deps` and the other
+NbVite Mix tasks prefer global `vp`, then `assets/node_modules/.bin/vp`, and
+finally use the pinned project-local bootstrap:
+
+```bash
+npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets install
 ```
 
 ## Core Template Helpers
@@ -211,7 +220,7 @@ Place images/fonts in `assets/images/` or `assets/fonts/`, then reference:
 
 **"Asset not found in Vite manifest"**: Run `mix nb_vite.build` or check that the asset path matches vite.config.js
 
-**"Vite+ dev server is not running"**: Start Phoenix with `mix phx.server` or manually run `mix nb_vite dev` (or `vp -C assets dev`)
+**"Vite+ dev server is not running"**: Start Phoenix with `mix phx.server` or manually run `mix nb_vite dev` (or `vp -C assets dev` when the direct CLI is available)
 
 **HMR not working**: Check that `priv/hot` file exists and contains correct dev server URL
 

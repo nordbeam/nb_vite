@@ -2,10 +2,10 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
   @moduledoc """
   Integrates Vite+ into a Phoenix application.
 
-  Vite+ is intentionally installed as an npm development dependency and
-  invoked through its `vp` command. Unlike the legacy Bun integration, this
-  module does not add a runtime dependency to the Mix project: Vite+ manages
-  the JavaScript runtime and package manager for the assets project.
+  Vite+ is intentionally installed as a development dependency and invoked
+  through its `vp` command. Unlike the legacy Bun integration, this module
+  does not add a runtime dependency to the Mix project. Dependency installation
+  stays with the package manager selected by the project's lockfile.
   """
 
   @compile {:no_warn_undefined,
@@ -44,17 +44,17 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
   @doc "Configures the Phoenix development watcher to invoke Vite+."
   def setup_watcher(igniter), do: configure_watcher(igniter)
 
-  @doc "Runs the Vite+ package manager for a Phoenix assets project."
+  @doc "Returns the dependency-install command for a Phoenix assets project."
   def install_command do
-    "vp -C assets install"
+    Elixir.NbVite.VitePlus.install_command()
   end
 
   defp setup_mix_aliases(igniter) do
     igniter
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.setup", fn zipper ->
-      {:ok, Sourceror.Zipper.replace(zipper, quote(do: ["cmd --cd assets vp install"]))}
+      {:ok, Sourceror.Zipper.replace(zipper, quote(do: ["nb_vite.deps"]))}
     end)
-    |> Igniter.Project.TaskAliases.add_alias("assets.setup", ["cmd --cd assets vp install"])
+    |> Igniter.Project.TaskAliases.add_alias("assets.setup", ["nb_vite.deps"])
     |> Igniter.Project.TaskAliases.modify_existing_alias("assets.build", fn zipper ->
       {:ok,
        Sourceror.Zipper.replace(
@@ -84,8 +84,7 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
     app_name = Igniter.Project.Application.app_name(igniter)
 
     watcher_value =
-      {:code,
-       Sourceror.parse_string!("{\"vp\", [\"dev\", cd: Path.expand(\"../assets\", __DIR__)]}")}
+      {:code, Sourceror.parse_string!("{Mix.Tasks.NbVite, :run, [[\"dev\"]]}")}
 
     Igniter.Project.Config.configure(
       igniter,
@@ -101,10 +100,14 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
       igniter,
       """
       Vite+ is configured for the assets project:
-      - The Phoenix dev watcher runs `vp dev` from assets/
+      - The Phoenix dev watcher runs `mix nb_vite dev`, which resolves Vite+
+        from the global CLI, assets/node_modules/.bin, or npm exec
       - Build and preview commands use the Vite+ toolchain
-      - Install Vite+ globally with: curl -fsSL https://vite.plus | bash
-      - Install assets with: vp -C assets install
+      - Dependency installation uses the package manager selected by the lockfile
+      - A global Vite+ install is optional: curl -fsSL https://vite.plus | bash
+      - Install assets with: mix nb_vite.deps
+      - Without global or local `vp`, commands are bootstrapped via:
+        npm exec --yes --package=vite-plus@0.3.0 -- vp ...
       """
     )
   end

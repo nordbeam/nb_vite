@@ -15,16 +15,20 @@ Vite plugin for Phoenix Framework with SSR support and nb_routes auto-regenerati
 ## Installation
 
 ```bash
-# Install Vite+ once (macOS/Linux), then add the plugin from your Phoenix app.
+# An optional global Vite+ CLI (macOS/Linux), then add the plugin from your Phoenix app.
 curl -fsSL https://vite.plus | bash
 vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
+# Without a global CLI, use the pinned bootstrap instead:
+# npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
 ```
 
 The Phoenix installer pins `vite-plus@0.3.0`, aliases `vite` to
 `npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins the matching Vitest runtime.
-Install dependencies with `vp -C assets install`. If Vite+ cannot be installed
-in a constrained environment, the npm CLI remains a supported fallback package
-manager; `@nordbeam/nb-vite` still comes directly from GitHub.
+Install dependencies with `mix nb_vite.deps`. NbVite prefers global `vp`, then
+`assets/node_modules/.bin/vp`, and finally bootstraps the pinned CLI with
+`npm exec --yes --package=vite-plus@0.3.0 -- vp ...`. The npm CLI remains a
+supported fallback package manager; `@nordbeam/nb-vite` still comes directly
+from GitHub.
 
 ## Usage
 
@@ -268,7 +272,9 @@ The package includes full TypeScript declarations. No additional `@types` packag
 
 ## Vite+ commands
 
-Run these from the Phoenix `assets/` directory (or prefix with `vp -C assets`):
+Run these from the Phoenix `assets/` directory (or prefix with `vp -C assets`)
+when the direct CLI is available. The `mix nb_vite` tasks resolve the same
+global/local/bootstrap order:
 
 ```bash
 vp install       # Resolve the assets lockfile

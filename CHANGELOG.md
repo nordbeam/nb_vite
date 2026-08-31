@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Vite+ bootstrap fallback
+
+* NbVite Mix tasks and the Phoenix watcher now prefer the global or project-local
+  `vp` executable and fall back to `npm exec --yes --package=vite-plus@0.3.0 -- vp`.
+* The installer always queues asset installation, including projects without a
+  globally installed Vite+ CLI.
+
 ### Vite+ migration
 
 * Moved the GitHub-distributed library build to Vite+ `vp pack`, preserving the public ESM
