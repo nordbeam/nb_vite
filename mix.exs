@@ -56,6 +56,8 @@ defmodule NbVite.MixProject do
         priv
         mix.exs
         README.md
+        usage-rules.md
+        usage-rules
         LICENSE
         CHANGELOG.md
         .formatter.exs
@@ -74,7 +76,8 @@ defmodule NbVite.MixProject do
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
-      extras: ["README.md", "CHANGELOG.md"]
+      extras: ["README.md", "CHANGELOG.md", "usage-rules.md"],
+      groups_for_extras: [Guides: ["usage-rules.md"]]
     ]
   end
 end

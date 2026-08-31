@@ -1,236 +1,78 @@
 # NbVite Usage Rules
 
-## What is NbVite?
-
-NbVite is a Phoenix integration library for Vite+ that enables modern frontend development with Hot Module Replacement (HMR), framework support (React, Vue, Svelte), and optimized production builds. It provides seamless integration between Elixir/Phoenix and Vite+'s unified tooling.
-
-**Note**: This is a pure Phoenix/Vite+ integration. For Inertia.js support, use the separate `nb_inertia` package. Bun is retained only as a legacy opt-in path.
+Use `nb_vite` for the Phoenix integration with Vite+, including HMR, asset
+helpers, production manifests, framework entrypoints, SSR, and the optional
+`nb_routes` watcher. The Elixir package and the GitHub-installed
+`@nordbeam/nb-vite` client package are complementary; inspect both before
+changing an application's setup.
 
 ## Installation
 
-### Add to mix.exs
-
-```elixir
-def deps do
-  [
-    {:nb_vite, "~> 0.1"}
-  ]
-end
-```
-
-### Run Igniter installer
+Install the Phoenix integration with its Igniter task, then install the
+standard dependency-backed skill manager:
 
 ```bash
-mix deps.get
 mix igniter.install nb_vite --typescript
+mix igniter.install usage_rules
 ```
 
-The installer configures the Vite+ watcher, `vite-plus@0.3.0`, the Vite core
-alias/override, and Vite+ package scripts. Install the global CLI if desired
-for direct `vp` commands:
-
-```bash
-curl -fsSL https://vite.plus | bash
-vp -C assets install
-```
-
-The installer does not require a global CLI. `mix nb_vite.deps` and the other
-NbVite Mix tasks prefer global `vp`, then `assets/node_modules/.bin/vp`, and
-finally use the pinned project-local bootstrap. The npm bootstrap and generated
-assets manifest require npm 12.0.2; npm 11 is unsupported:
-
-```bash
-corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp -C assets install
-```
-
-## Core Template Helpers
-
-All helpers are in the `NbVite` module. Alias it in your Phoenix helpers:
+Configure the application project's `mix.exs` so the package skill is synced
+to the project-local agent directory:
 
 ```elixir
-# lib/myapp_web.ex
-def html do
-  quote do
-    # ... existing imports ...
-    alias NbVite, as: Vite
-  end
-end
-```
-
-### Essential Helpers
-
-```heex
-<!-- Development HMR client (auto-included only in dev) -->
-<%= NbVite.vite_client() %>
-
-<!-- React Fast Refresh (if using React, only in dev) -->
-<%= NbVite.react_refresh() %>
-
-<!-- Load JavaScript/CSS assets (auto-switches dev/prod) -->
-<%= NbVite.vite_assets("js/app.js") %>
-<%= NbVite.vite_assets("css/app.css") %>
-
-<!-- Multiple assets at once -->
-<%= NbVite.vite_assets(["js/app.js", "css/app.css"]) %>
-
-<!-- Get raw asset path -->
-<link rel="stylesheet" href={NbVite.asset_path("css/custom.css")} />
-```
-
-### Typical Layout Pattern
-
-```heex
-<!-- lib/myapp_web/components/layouts/root.html.heex -->
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <%= NbVite.vite_client() %>
-    <%= NbVite.react_refresh() %>
-    <%= NbVite.vite_assets(["js/app.js", "css/app.css"]) %>
-  </head>
-  <body>
-    <%= @inner_content %>
-  </body>
-</html>
-```
-
-## Environment Behavior
-
-NbVite automatically detects the environment:
-
-- **Development**: Assets loaded from the Vite+ dev server (http://localhost:5173) with HMR
-- **Production**: Assets loaded from manifest.json with hashed filenames
-
-Detection uses `priv/hot` file (created by Vite dev server).
-
-## Mix Tasks
-
-```bash
-# Run the Vite+ dev server
-mix nb_vite dev
-
-# Install JavaScript dependencies through Vite+
-mix nb_vite.deps
-
-# Build assets for production
-mix nb_vite.build
-
-# Any Vite+ command
-mix nb_vite <command> <args>
-```
-
-## Configuration
-
-### Application Config (Optional)
-
-```elixir
-# config/config.exs
-config :nb_vite,
-  hot_file: Path.join([File.cwd!(), "priv", "hot"]),
-  manifest_path: Path.join([File.cwd!(), "priv", "static", "assets", "manifest.json"]),
-  static_url_path: "/"  # Or function for CDN
-```
-
-### CDN Support
-
-```elixir
-# config/prod.exs
-config :nb_vite, :static_url_path, fn path ->
-  "https://cdn.example.com#{path}"
-end
-```
-
-## Development Workflow
-
-1. **Start Phoenix with Vite+ dev server**:
-   ```bash
-   mix phx.server
-   ```
-   The `vp dev` server runs automatically via Phoenix watchers.
-
-2. **Edit assets**: Changes auto-reload via HMR
-3. **Add new assets**: Include them in `vite.config.js` input array
-
-## Production Deployment
-
-```bash
-mix nb_vite.build    # Builds assets
-mix phx.digest       # Digests static files
-```
-
-The underlying frontend command is `vp build` from `assets/`; the Mix wrapper
-keeps Phoenix's existing release workflow intact.
-
-Or use the typical assets.deploy alias:
-
-```elixir
-# mix.exs
-defp aliases do
+def project do
   [
-    "assets.deploy": ["nb_vite.build", "phx.digest"]
+    # ...
+    usage_rules: usage_rules()
+  ]
+end
+
+defp usage_rules do
+  [
+    skills: [
+      location: ".agents/skills",
+      package_skills: [:nb_vite]
+    ]
   ]
 end
 ```
 
-Then: `mix assets.deploy`
+Then sync the configured package skill:
 
-## Common Patterns
-
-### Multiple Entry Points
-
-```javascript
-// assets/vite.config.js
-import { defineConfig, lazyPlugins } from 'vite-plus'
-import phoenix from '@nordbeam/nb-vite'
-
-export default defineConfig({
-  plugins: lazyPlugins(() => [
-    phoenix({
-      input: [
-        'js/app.js',
-        'js/admin.js',
-        'css/app.css'
-      ],
-      // ... other phoenix config
-    })
-  ])
-})
+```bash
+mix usage_rules.sync
 ```
 
-```heex
-<!-- Different entries for different pages -->
-<%= NbVite.vite_assets("js/admin.js") %>
+## Vite+ workflow
+
+Use the generated `vite-plus` configuration and run frontend commands from
+the `assets/` directory:
+
+```bash
+vp install
+vp dev
+vp check
+vp build
 ```
 
-### Static Assets
+Generated projects use the pinned Vite+ release and npm 12 bootstrap fallback
+documented by the selected package release. Preserve existing scripts and
+dependencies when migrating an application.
 
-Place images/fonts in `assets/images/` or `assets/fonts/`, then reference:
+## Phoenix integration
 
-```heex
-<img src={NbVite.asset_path("images/logo.png")} />
-```
+Use `NbVite.vite_client/0`, `NbVite.react_refresh/0`, and
+`NbVite.vite_assets/1` in the root layout. Development assets come from the
+Vite+ server; production assets come from the generated manifest. If
+`nb_routes` is installed, add its matching `nbRoutes` export to the Vite+
+plugin list and verify the router glob and `mix nb_routes.gen` command.
 
-## Important Notes
+For Phoenix 1.8 colocated hooks or SSR, confirm the selected installer detects
+the feature before enabling it and test the generated aliases/entrypoints.
 
-- **Never manually manage priv/hot**: Created/removed by Vite dev server automatically
-- **Manifest required in production**: Run `mix nb_vite.build` before deployment
-- **Asset paths must match Vite config**: Entry points in `vite.config.js` must match paths passed to `vite_assets/1`
-- **For Inertia.js**: Use `nb_inertia` package separately
+## Verification
 
-## Troubleshooting
-
-**"Asset not found in Vite manifest"**: Run `mix nb_vite.build` or check that the asset path matches vite.config.js
-
-**"Vite+ dev server is not running"**: Start Phoenix with `mix phx.server` or manually run `mix nb_vite dev` (or `vp -C assets dev` when the direct CLI is available)
-
-**HMR not working**: Check that `priv/hot` file exists and contains correct dev server URL
-
-**Assets not loading in production**: Ensure `mix nb_vite.build` was run and manifest.json exists
-
-## Vite+ compatibility
-
-Generated projects use Vite+ `0.3.0`, Node.js `>=20.19.0`, the Vite core alias
-`npm:@voidzero-dev/vite-plus-core@0.3.0`, and a matching `vitest` override.
-The GitHub-distributed plugin build intentionally uses TypeScript 5.9.
-Generated apps use `vp check` for formatting/linting and the `check` package
-script for the separate TypeScript 5.9 compiler pass.
+Run `mix deps.get`, `mix compile`, `mix test`, `vp check`, and `vp build` (or
+`vp pack` when refreshing the distributed plugin). Check `priv/hot`, the
+manifest path, TLS settings, and watcher output when diagnosing asset or HMR
+issues.
