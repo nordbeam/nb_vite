@@ -28,8 +28,9 @@ Install dependencies with `mix nb_vite.deps`. NbVite prefers global `vp`, then
 `assets/node_modules/.bin/vp`, and finally bootstraps the pinned CLI with
 `npm exec --yes --package=vite-plus@0.3.0 -- vp ...`. npm 12.0.2 is required
 for the npm bootstrap and generated assets projects; npm 11 is unsupported.
-The installer sets `allow-git=root` in `assets/.npmrc` so npm 12 can fetch the
-declared first-party package without allowing transitive git dependencies.
+The installer sets `allow-git=root` and `allow-remote=all` in `assets/.npmrc` so
+npm 12 can fetch the declared first-party package and registry packages such as
+Tailwind that resolve platform artifacts through remote tarballs.
 `@nordbeam/nb-vite` still comes directly from GitHub.
 
 ## Usage

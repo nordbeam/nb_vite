@@ -194,15 +194,16 @@ defmodule Mix.Tasks.NbViteTest do
 
       migrated = Install.merge_npmrc(existing)
 
-      assert migrated == existing <> "allow-git=root\n"
+      assert migrated == existing <> "allow-git=root\nallow-remote=all\n"
       assert Install.merge_npmrc(migrated) == migrated
     end
 
     test "replaces incompatible npm git policies and preserves comments" do
-      existing = "# allow-git=none\nallow-git = none\nfund=false\n"
+      existing =
+        "# allow-git=none\nallow-git = none\nallow-remote = none\nfund=false\n"
 
       assert Install.merge_npmrc(existing) ==
-               "# allow-git=none\nallow-git=root\nfund=false\n"
+               "# allow-git=none\nallow-git=root\nallow-remote=all\nfund=false\n"
     end
 
     test "maps local nb_vite Mix dependencies to the GitHub package directory" do

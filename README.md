@@ -51,9 +51,10 @@ global `vp`, then `assets/node_modules/.bin/vp`, and finally bootstrap the
 pinned CLI with `npm exec --yes --package=vite-plus@0.3.0 -- vp ...`.
 For an existing app, run `mix nb_vite.deps` after migrating its manifest.
 The generated manifest requires npm 12.0.2, and `mix nb_vite.deps` runs the
-Vite+ installer. The installer writes `assets/.npmrc` with `allow-git=root`,
-which permits only the GitHub dependencies declared by the application root.
-The Nordbeam package source remains GitHub.
+Vite+ installer. The installer writes `assets/.npmrc` with `allow-git=root` for
+the application-declared GitHub packages and `allow-remote=all` for registry
+packages such as Tailwind that resolve platform artifacts through remote
+tarballs. The Nordbeam package source remains GitHub.
 
 **Benefits of using the package:**
 - Standard package dependency management through Vite+
