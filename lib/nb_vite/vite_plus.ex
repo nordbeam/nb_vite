@@ -3,6 +3,8 @@ defmodule NbVite.VitePlus do
 
   @vite_plus_version "0.3.0"
   @vite_plus_package "vite-plus@#{@vite_plus_version}"
+  @npm_version "12.0.2"
+  @npm_package "npm@#{@npm_version}"
 
   @doc false
   def version, do: @vite_plus_version
@@ -17,7 +19,15 @@ defmodule NbVite.VitePlus do
         {executable, args}
 
       :npm_exec ->
-        {"npm", ["exec", "--yes", "--package=#{@vite_plus_package}", "--", "vp" | args]}
+        {"corepack",
+         [
+           @npm_package,
+           "exec",
+           "--yes",
+           "--package=#{@vite_plus_package}",
+           "--",
+           "vp" | args
+         ]}
     end
   end
 
@@ -58,7 +68,7 @@ defmodule NbVite.VitePlus do
         "#{Path.relative_to(executable, project_dir)} -C assets install"
 
       :npm_exec ->
-        "npm exec --yes --package=#{@vite_plus_package} -- vp -C assets install"
+        "corepack #{@npm_package} exec --yes --package=#{@vite_plus_package} -- vp -C assets install"
     end
   end
 end

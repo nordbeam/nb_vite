@@ -101,13 +101,13 @@ defmodule Mix.Tasks.NbVite.Install.VitePlusIntegration do
       """
       Vite+ is configured for the assets project:
       - The Phoenix dev watcher runs `mix nb_vite dev`, which resolves Vite+
-        from the global CLI, assets/node_modules/.bin, or npm exec
+        from the global CLI, assets/node_modules/.bin, or Corepack with npm 12
       - Build and preview commands use the Vite+ toolchain
       - npm 12.0.2 is the generated package-manager baseline
       - A global Vite+ install is optional: curl -fsSL https://vite.plus | bash
       - Install assets with: mix nb_vite.deps
       - Without global or local `vp`, the pinned 0.3.0 CLI is bootstrapped via:
-        npm exec --yes --package=vite-plus@0.3.0 -- vp ...
+        corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp ...
       """
     )
   end

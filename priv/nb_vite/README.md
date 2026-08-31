@@ -19,14 +19,14 @@ Vite plugin for Phoenix Framework with SSR support and nb_routes auto-regenerati
 curl -fsSL https://vite.plus | bash
 vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
 # Without a global CLI, use the pinned bootstrap instead:
-# npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
+# corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
 ```
 
 The Phoenix installer pins `vite-plus@0.3.0`, aliases `vite` to
 `npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins the matching Vitest runtime.
 Install dependencies with `mix nb_vite.deps`. NbVite prefers global `vp`, then
 `assets/node_modules/.bin/vp`, and finally bootstraps the pinned CLI with
-`npm exec --yes --package=vite-plus@0.3.0 -- vp ...`. npm 12.0.2 is required
+`corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp ...`. npm 12.0.2 is required
 for the npm bootstrap and generated assets projects; npm 11 is unsupported.
 The installer sets `allow-git=root` and `allow-remote=all` in `assets/.npmrc` so
 npm 12 can fetch the declared first-party package and registry packages such as

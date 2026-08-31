@@ -26,6 +26,8 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
               Mix.Tasks.NbVite.Install
             ]}
 
+  @npm_version "12.0.2"
+
   @doc """
   Integrates Bun into the project.
 
@@ -244,7 +246,7 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
         npm_path =~ "bun" -> "mix bun assets install"
         npm_path =~ "pnpm" -> "pnpm install --prefix assets"
         npm_path =~ "yarn" -> "cd assets && yarn install"
-        true -> "npm install --prefix assets"
+        true -> "corepack npm@#{@npm_version} install --prefix assets"
       end
     end
   end

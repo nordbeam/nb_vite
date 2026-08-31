@@ -40,7 +40,7 @@ curl -fsSL https://vite.plus | bash
 # From the Phoenix project root, add the plugin to assets/
 vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
 # Without a global CLI, use the pinned bootstrap instead:
-# npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
+# corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp -C assets add -D @nordbeam/nb-vite@git+https://github.com/nordbeam/nb_vite.git
 ```
 
 Vite+ is the supported project workflow. The installer adds
@@ -48,7 +48,7 @@ Vite+ is the supported project workflow. The installer adds
 `npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins Vite+'s Vitest runtime.
 The installer and `mix nb_vite` tasks do not require a global CLI: they prefer
 global `vp`, then `assets/node_modules/.bin/vp`, and finally bootstrap the
-pinned CLI with `npm exec --yes --package=vite-plus@0.3.0 -- vp ...`.
+pinned CLI with `corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp ...`.
 For an existing app, run `mix nb_vite.deps` after migrating its manifest.
 The generated manifest requires npm 12.0.2, and `mix nb_vite.deps` runs the
 Vite+ installer. The installer writes `assets/.npmrc` with `allow-git=root` for

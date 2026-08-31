@@ -40,7 +40,7 @@ finally use the pinned project-local bootstrap. The npm bootstrap and generated
 assets manifest require npm 12.0.2; npm 11 is unsupported:
 
 ```bash
-npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets install
+corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp -C assets install
 ```
 
 ## Core Template Helpers

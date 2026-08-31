@@ -5,6 +5,7 @@ defmodule Mix.Tasks.NbViteTest do
 
   alias Mix.Tasks.NbVite
   alias Mix.Tasks.NbVite.Install
+  alias Mix.Tasks.NbVite.Install.BunIntegration
 
   describe "run/1" do
     test "passes arguments to Vite+ when available" do
@@ -128,8 +129,9 @@ defmodule Mix.Tasks.NbViteTest do
           assets_dir = Path.join(File.cwd!(), "assets")
 
           assert Elixir.NbVite.VitePlus.command(["build"], assets_dir) ==
-                   {"npm",
+                   {"corepack",
                     [
+                      "npm@12.0.2",
                       "exec",
                       "--yes",
                       "--package=vite-plus@0.3.0",
@@ -139,7 +141,7 @@ defmodule Mix.Tasks.NbViteTest do
                     ]}
 
           assert Elixir.NbVite.VitePlus.install_command(File.cwd!()) ==
-                   "npm exec --yes --package=vite-plus@0.3.0 -- vp -C assets install"
+                   "corepack npm@12.0.2 exec --yes --package=vite-plus@0.3.0 -- vp -C assets install"
         end)
       end)
     end
@@ -185,6 +187,45 @@ defmodule Mix.Tasks.NbViteTest do
           if old_path, do: System.put_env("PATH", old_path), else: System.delete_env("PATH")
         end
       end)
+    end
+  end
+
+  describe "legacy package manager fallback" do
+    test "routes npm installs through npm 12" do
+      in_tmp(fn ->
+        bin_dir = Path.join(File.cwd!(), "bin")
+        npm = Path.join(bin_dir, "npm")
+        File.mkdir_p!(bin_dir)
+        File.write!(npm, "#!/bin/sh\n")
+        File.chmod!(npm, 0o755)
+
+        old_path = System.get_env("PATH")
+        System.put_env("PATH", bin_dir)
+
+        try do
+          assert BunIntegration.install_command(%{assigns: %{}}) ==
+                   "corepack npm@12.0.2 install --prefix assets"
+        after
+          if old_path, do: System.put_env("PATH", old_path), else: System.delete_env("PATH")
+        end
+      end)
+    end
+  end
+
+  describe "repository package manifest" do
+    test "pins the repository package manager to npm 12" do
+      package_json =
+        Path.expand("../../../package.json", __DIR__)
+        |> File.read!()
+        |> Jason.decode!()
+
+      assert package_json["packageManager"] == "npm@12.0.2"
+
+      assert package_json["devEngines"]["packageManager"] == %{
+               "name" => "npm",
+               "version" => "12.0.2",
+               "onFail" => "download"
+             }
     end
   end
 

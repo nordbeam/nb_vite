@@ -24,7 +24,7 @@ export default defineConfig({
       // nb_vite's runtime dependencies. Keep these small dependencies in the
       // bundle so `priv/static/nb_vite/index.js` remains standalone.
       alwaysBundle: ['picocolors', 'vite-plugin-full-reload'],
-      // Keep Vite and Node built-ins as imports in the published plugin.
+      // Keep Vite and Node built-ins as imports in the GitHub-installed plugin.
       // Vite is a peer dependency and Node built-ins are supplied by the
       // host running the config/plugin.
       neverBundle: ['vite', /^node:/, 'fs', 'path', 'net', 'http', 'child_process'],

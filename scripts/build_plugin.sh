@@ -8,8 +8,8 @@ if command -v vp >/dev/null 2>&1; then
 elif [[ -x "node_modules/.bin/vp" ]]; then
   task_vp_bin=("node_modules/.bin/vp")
 else
-  echo "No global or project-local vp found; bootstrapping Vite+ 0.3.0 with npm exec."
-  task_vp_bin=("npm" "exec" "--yes" "--package=vite-plus@0.3.0" "--" "vp")
+  echo "No global or project-local vp found; bootstrapping Vite+ 0.3.0 with npm 12.0.2."
+  task_vp_bin=("corepack" "npm@12.0.2" "exec" "--yes" "--package=vite-plus@0.3.0" "--" "vp")
 fi
 
 # Vite+ installs with the repository's pinned npm 12.0.2 package-manager policy

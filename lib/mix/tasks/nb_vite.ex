@@ -58,7 +58,7 @@ defmodule Mix.Tasks.NbVite do
     # from the assets directory so its local vite-plus package and config are
     # resolved exactly as they are for `vp dev`/`vp build`. When the global
     # CLI is unavailable, NbVite prefers the project's .bin entry and then
-    # bootstraps the pinned CLI through npm exec.
+    # bootstraps the pinned CLI through Corepack and npm 12.
     case Mix.shell().cmd(Elixir.NbVite.VitePlus.command(args, assets_dir),
            cd: assets_dir,
            env: env
