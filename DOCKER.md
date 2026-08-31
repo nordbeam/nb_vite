@@ -51,11 +51,17 @@ RUN apt-get update -y && \
     apt-get clean && \
     rm -f /var/lib/apt/lists/*_*
 
-# Install Node.js (required for Vite)
+# Install Node.js for the mixed Elixir/Vite+ builder. Vite+ can also manage
+# the project runtime when the official Vite+ image is used.
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -f /var/lib/apt/lists/*_*
+
+# Install the pinned Vite+ CLI. VP_HOME gives Docker a stable executable path.
+RUN curl -fsSL https://vite.plus | VP_VERSION=0.3.0 VP_HOME=/opt/vite-plus bash
+ENV VP_HOME="/opt/vite-plus"
+ENV PATH="/opt/vite-plus/bin:${PATH}"
 
 # Prepare build directory
 WORKDIR /app
@@ -85,12 +91,11 @@ COPY priv priv
 COPY lib lib
 COPY assets assets
 
-# Change to assets directory and install Node dependencies
+# Change to assets directory and install Vite+ dependencies
 WORKDIR /app/assets
 
-# Install JavaScript dependencies
-# Use npm ci for faster, more reliable installs in CI/Docker
-RUN npm ci --prefer-offline --no-audit --progress=false --loglevel=error
+# Vite+ delegates to the package manager selected by the assets lockfile.
+RUN vp install --frozen-lockfile
 
 # Build assets
 # The assets.deploy task runs: nb_vite.deps, nb_vite build, phx.digest
@@ -152,25 +157,24 @@ CMD ["/app/bin/server"]
 
 ### Important Docker Considerations
 
-1. **Node.js Installation**: Vite requires Node.js to build assets. Install it in the builder stage.
+1. **Vite+ Installation**: Install the pinned `vp` CLI in the builder stage. The official image `ghcr.io/voidzero-dev/vite-plus:0.3.0` is an alternative when the build does not also need Elixir tooling.
 
 2. **Asset Build Order**:
    - Install Elixir dependencies first (`mix deps.get`)
    - Copy application code
-   - Install Node dependencies (`npm ci`)
+   - Install frontend dependencies (`vp install --frozen-lockfile`)
    - Build assets (`mix assets.deploy`)
    - Build release
 
-3. **npm ci vs npm install**: Use `npm ci` in Docker for:
-   - Faster installs
-   - More reliable builds
-   - Proper lockfile handling
+3. **Reproducible Vite+ installs**: Commit the assets lockfile and use
+   `vp install --frozen-lockfile` in CI/Docker. Vite+ delegates to npm, pnpm,
+   or Yarn according to the project's lockfile/package-manager metadata.
 
 4. **Multi-Stage Builds**: Keep Node.js and build tools out of the final runtime image to minimize size.
 
-### Alternative: Using Bun
+### Legacy alternative: Using Bun
 
-If you're using Bun as your JavaScript runtime:
+Older projects may still opt into the Elixir-managed Bun integration:
 
 ```dockerfile
 # Install Bun instead of Node.js
@@ -236,10 +240,10 @@ volumes:
 **Cause**: Missing Node dependencies or Vite not installed.
 
 **Solution**:
-1. Ensure Node.js is installed in the builder stage
-2. Run `npm ci` before building assets
+1. Ensure the pinned Vite+ CLI is installed in the builder stage
+2. Run `vp install --frozen-lockfile` before building assets
 3. Verify `vite` is in your `package.json` dependencies
-4. Check the build logs for npm install errors
+4. Check the build logs for Vite+ install errors
 
 ### Issue: Assets not updating after rebuild
 
@@ -254,11 +258,13 @@ docker build --no-cache -t my_app .
 docker build --build-arg CACHEBUST=$(date +%s) -t my_app .
 ```
 
-### Issue: Workspace setup with npm/pnpm/yarn
+### Issue: Workspace setup with the assets package manager
 
 **Cause**: Some package managers have issues with Phoenix's `../deps` structure.
 
-**Solution**: Consider using Bun which handles workspaces better, or use the automatic aliasing that NbVite provides (no workspace configuration needed).
+**Solution**: Run `vp install` from `assets/` so Vite+ uses the generated
+workspace entries and `vite` alias. Do not add Phoenix dependencies to a
+separate workspace unless the app needs them.
 
 ### Issue: Permission errors in Docker
 
@@ -329,4 +335,4 @@ databases:
 
 - [Phoenix Deployment Guides](https://hexdocs.pm/phoenix/deployment.html)
 - [Elixir Release Documentation](https://hexdocs.pm/mix/Mix.Tasks.Release.html)
-- [Vite Production Build](https://vitejs.dev/guide/build.html)
+- [Vite+ Docker and build guide](https://viteplus.dev/guide/docker.html)

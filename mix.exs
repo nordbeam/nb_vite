@@ -8,7 +8,7 @@ defmodule NbVite.MixProject do
     [
       app: :nb_vite,
       version: @version,
-      elixir: "~> 1.13",
+      elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
@@ -31,8 +31,8 @@ defmodule NbVite.MixProject do
       {:phoenix, "~> 1.7"},
       {:phoenix_html, "~> 3.3 or ~> 4.0"},
       {:jason, "~> 1.2"},
-      {:igniter, "~> 0.7", optional: true},
-      {:ex_doc, "~> 0.30", only: :dev, runtime: false},
+      {:igniter, "~> 0.8", optional: true},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       # Test dependencies
       {:phx_new, "~> 1.0", only: [:test]}
     ]

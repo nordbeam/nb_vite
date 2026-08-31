@@ -1,27 +1,23 @@
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import { AddressInfo } from "node:net";
-import { IncomingMessage, ServerResponse } from "node:http";
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { AddressInfo } from 'node:net';
+import { IncomingMessage, ServerResponse } from 'node:http';
 import {
   Plugin,
   UserConfig,
   ConfigEnv,
   ResolvedConfig,
   Manifest,
-  ManifestChunk,
   PluginOption,
   loadEnv,
   searchForWorkspaceRoot,
   SSROptions,
   Rollup,
   ViteDevServer,
-} from "vite";
-import { OutputChunk } from "rollup";
-import colors from "picocolors";
-import fullReload, {
-  Config as FullReloadConfig,
-} from "vite-plugin-full-reload";
+} from 'vite';
+import colors from 'picocolors';
+import fullReload, { Config as FullReloadConfig } from 'vite-plugin-full-reload';
 
 // No longer need vite-node imports - using built-in Module Runner API
 
@@ -148,11 +144,9 @@ interface LocalDependencySupport {
   optimizeDepsExclude: string[];
 }
 
-type ResolveAliasInput = NonNullable<
-  NonNullable<UserConfig["resolve"]>["alias"]
->;
+type ResolveAliasInput = NonNullable<NonNullable<UserConfig['resolve']>['alias']>;
 
-type ServerFsInput = NonNullable<NonNullable<UserConfig["server"]>["fs"]>;
+type ServerFsInput = NonNullable<NonNullable<UserConfig['server']>['fs']>;
 
 interface RefreshConfig {
   paths: string[];
@@ -163,22 +157,20 @@ interface PhoenixPlugin extends Plugin {
   config: (config: UserConfig, env: ConfigEnv) => UserConfig;
 }
 
-type DevServerUrl = `${"http" | "https"}://${string}:${number}`;
+type DevServerUrl = `${'http' | 'https'}://${string}:${number}`;
 
 let exitHandlersBound = false;
 
 export const refreshPaths = [
-  "lib/**/*.ex",
-  "lib/**/*.heex",
-  "lib/**/*.eex",
-  "lib/**/*.leex",
-  "lib/**/*.sface",
-  "priv/gettext/**/*.po",
-].filter((path) => fs.existsSync(path.replace(/\*\*$/, "")));
+  'lib/**/*.ex',
+  'lib/**/*.heex',
+  'lib/**/*.eex',
+  'lib/**/*.leex',
+  'lib/**/*.sface',
+  'priv/gettext/**/*.po',
+].filter((path) => fs.existsSync(path.replace(/\*\*$/, '')));
 
-export default function phoenix(
-  config: string | string[] | PluginConfig,
-): PluginOption[] {
+export default function phoenix(config: string | string[] | PluginConfig): PluginOption[] {
   const pluginConfig = resolvePluginConfig(config);
 
   return [
@@ -190,20 +182,18 @@ export default function phoenix(
 /**
  * Resolve the Phoenix plugin configuration.
  */
-function resolvePluginConfig(
-  config: string | string[] | PluginConfig,
-): Required<PluginConfig> {
-  if (typeof config === "undefined") {
+function resolvePluginConfig(config: string | string[] | PluginConfig): Required<PluginConfig> {
+  if (typeof config === 'undefined') {
     throw new Error(
-      "phoenix-vite-plugin: Missing configuration. Please provide an input path or a configuration object.",
+      'phoenix-vite-plugin: Missing configuration. Please provide an input path or a configuration object.',
     );
   }
 
-  if (typeof config === "string" || Array.isArray(config)) {
+  if (typeof config === 'string' || Array.isArray(config)) {
     config = { input: config, ssr: config };
   }
 
-  if (typeof config.input === "undefined") {
+  if (typeof config.input === 'undefined') {
     throw new Error(
       'phoenix-vite-plugin: Missing configuration for "input". Please specify the entry point(s) for your application.',
     );
@@ -214,25 +204,25 @@ function resolvePluginConfig(
     const resolvedPath = path.resolve(process.cwd(), inputPath);
     if (!fs.existsSync(resolvedPath)) {
       console.warn(
-        `[nb-vite] ${colors.yellow("Warning")}: Input file "${inputPath}" does not exist. Make sure to create it before running Vite.`,
+        `[nb-vite] ${colors.yellow('Warning')}: Input file "${inputPath}" does not exist. Make sure to create it before running Vite.`,
       );
     }
   };
 
-  if (typeof config.input === "string") {
+  if (typeof config.input === 'string') {
     validateInputPath(config.input);
   } else if (Array.isArray(config.input)) {
     config.input.forEach((input) => {
-      if (typeof input === "string") {
+      if (typeof input === 'string') {
         validateInputPath(input);
       }
     });
   }
 
-  if (typeof config.publicDirectory === "string") {
-    config.publicDirectory = config.publicDirectory.trim().replace(/^\/+/, "");
+  if (typeof config.publicDirectory === 'string') {
+    config.publicDirectory = config.publicDirectory.trim().replace(/^\/+/, '');
 
-    if (config.publicDirectory === "") {
+    if (config.publicDirectory === '') {
       throw new Error(
         "phoenix-vite-plugin: publicDirectory must be a subdirectory. E.g. 'priv/static'. Got empty string after normalization.",
       );
@@ -242,22 +232,19 @@ function resolvePluginConfig(
     const publicDirPath = path.resolve(process.cwd(), config.publicDirectory);
     if (!fs.existsSync(publicDirPath)) {
       console.warn(
-        `[nb-vite] ${colors.yellow("Warning")}: Public directory "${config.publicDirectory}" does not exist. It will be created during build.`,
+        `[nb-vite] ${colors.yellow('Warning')}: Public directory "${config.publicDirectory}" does not exist. It will be created during build.`,
       );
     }
   }
 
   if (config.publicDirectory === undefined) {
-    config.publicDirectory = "priv/static";
+    config.publicDirectory = 'priv/static';
   }
 
-  if (typeof config.buildDirectory === "string") {
-    config.buildDirectory = config.buildDirectory
-      .trim()
-      .replace(/^\/+/, "")
-      .replace(/\/+$/, "");
+  if (typeof config.buildDirectory === 'string') {
+    config.buildDirectory = config.buildDirectory.trim().replace(/^\/+/, '').replace(/\/+$/, '');
 
-    if (config.buildDirectory === "") {
+    if (config.buildDirectory === '') {
       throw new Error(
         "phoenix-vite-plugin: buildDirectory must be a subdirectory. E.g. 'assets'. Got empty string after normalization.",
       );
@@ -265,16 +252,16 @@ function resolvePluginConfig(
   }
 
   if (config.buildDirectory === undefined) {
-    config.buildDirectory = "assets";
+    config.buildDirectory = 'assets';
   }
 
-  if (typeof config.ssrOutputDirectory === "string") {
+  if (typeof config.ssrOutputDirectory === 'string') {
     config.ssrOutputDirectory = config.ssrOutputDirectory
       .trim()
-      .replace(/^\/+/, "")
-      .replace(/\/+$/, "");
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '');
 
-    if (config.ssrOutputDirectory === "") {
+    if (config.ssrOutputDirectory === '') {
       throw new Error(
         "phoenix-vite-plugin: ssrOutputDirectory must be a subdirectory. E.g. 'priv/ssr'. Got empty string after normalization.",
       );
@@ -282,19 +269,15 @@ function resolvePluginConfig(
   }
 
   if (config.ssrOutputDirectory === undefined) {
-    config.ssrOutputDirectory = "priv/ssr";
+    config.ssrOutputDirectory = 'priv/ssr';
   }
 
   if (config.hotFile === undefined) {
-    config.hotFile = path.join("priv", "hot");
+    config.hotFile = path.join('priv', 'hot');
   }
 
   if (config.manifestPath === undefined) {
-    config.manifestPath = path.join(
-      config.publicDirectory,
-      config.buildDirectory,
-      "manifest.json",
-    );
+    config.manifestPath = path.join(config.publicDirectory, config.buildDirectory, 'manifest.json');
   }
 
   if (config.ssr === undefined) {
@@ -342,9 +325,7 @@ function resolvePluginConfig(
     if (ssrDev.entryPoint === undefined) {
       // Use the ssr option as the default entry point for development
       // This enables unified SSR entry: set ssr once, use for both dev and prod
-      ssrDev.entryPoint = typeof config.ssr === 'string'
-        ? `./${config.ssr}`
-        : './js/ssr.tsx';
+      ssrDev.entryPoint = typeof config.ssr === 'string' ? `./${config.ssr}` : './js/ssr.tsx';
     }
     if (ssrDev.hotFile === undefined) {
       ssrDev.hotFile = path.join('priv', 'ssr-hot');
@@ -354,7 +335,7 @@ function resolvePluginConfig(
 
   // Log resolved configuration in verbose mode
   if (process.env.DEBUG || process.env.VERBOSE) {
-    console.log(colors.dim("Phoenix Vite Plugin - Resolved Configuration:"));
+    console.log(colors.dim('Phoenix Vite Plugin - Resolved Configuration:'));
     console.log(
       colors.dim(
         JSON.stringify(
@@ -392,7 +373,7 @@ function resolvePluginConfig(
  */
 async function setupSSREndpoint(
   viteServer: ViteDevServer,
-  ssrConfig: Required<SSRConfig>
+  ssrConfig: Required<SSRConfig>,
 ): Promise<{ cleanup: () => void } | null> {
   console.log('[nb-vite:ssr] Initializing SSR endpoint with Module Runner...');
 
@@ -406,7 +387,7 @@ async function setupSSREndpoint(
 
   // Watch for file changes and invalidate cache
   viteServer.watcher.on('change', async (file: string) => {
-    const jsDir = path.resolve(viteServer.config.root, "./js");
+    const jsDir = path.resolve(viteServer.config.root, './js');
     if (!file.startsWith(jsDir) || !file.match(/\.(tsx?|jsx?)$/)) {
       return;
     }
@@ -414,7 +395,9 @@ async function setupSSREndpoint(
     // Skip auto-generated files that don't affect SSR
     const fileName = file.split('/').pop() || '';
     if (fileName === 'routes.js' || fileName === 'routes.d.ts') {
-      console.log(`[nb-vite:ssr] Skipping SSR cache invalidation for: ${file.replace(viteServer.config.root, '')}`);
+      console.log(
+        `[nb-vite:ssr] Skipping SSR cache invalidation for: ${file.replace(viteServer.config.root, '')}`,
+      );
       return;
     }
 
@@ -457,7 +440,9 @@ async function setupSSREndpoint(
       // - Source map support
       // - Module execution in SSR context
       // - Proper module resolution
-      const ssrModule = await runner.import(ssrEntryPath) as { render?: (page: unknown) => Promise<unknown> };
+      const ssrModule = (await runner.import(ssrEntryPath)) as {
+        render?: (page: unknown) => Promise<unknown>;
+      };
 
       if (!ssrModule.render || typeof ssrModule.render !== 'function') {
         throw new Error('SSR entry must export a "render" function');
@@ -474,91 +459,105 @@ async function setupSSREndpoint(
   function readBody(req: IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
       let body = '';
-      req.on('data', (chunk: Buffer | string) => body += chunk);
+      req.on('data', (chunk: Buffer | string) => (body += chunk));
       req.on('end', () => resolve(body));
       req.on('error', reject);
     });
   }
 
   // Add health check endpoint
-  viteServer.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    if (req.url === ssrConfig.healthPath && req.method === 'GET') {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.end(JSON.stringify({
-        status: 'ok',
-        ready: !!cachedRender,
-        mode: 'vite-plugin',
-      }));
-      return;
-    }
+  viteServer.middlewares.use(
+    async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      if (req.url === ssrConfig.healthPath && req.method === 'GET') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.end(
+          JSON.stringify({
+            status: 'ok',
+            ready: !!cachedRender,
+            mode: 'vite-plugin',
+          }),
+        );
+        return;
+      }
 
-    next();
-  });
+      next();
+    },
+  );
 
   // Add SSR endpoint
-  viteServer.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    if (req.url !== ssrConfig.path) {
-      return next();
-    }
+  viteServer.middlewares.use(
+    async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      if (req.url !== ssrConfig.path) {
+        return next();
+      }
 
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      // CORS headers
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-      res.statusCode = 200;
-      res.end();
-      return;
-    }
+      // Handle preflight
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 200;
+        res.end();
+        return;
+      }
 
-    // Only allow POST
-    if (req.method !== 'POST') {
-      res.statusCode = 405;
-      res.end('Method not allowed');
-      return;
-    }
+      // Only allow POST
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end('Method not allowed');
+        return;
+      }
 
-    try {
-      // Read request body
-      const body = await readBody(req);
-      const page = JSON.parse(body);
+      try {
+        // Read request body
+        const body = await readBody(req);
+        const page = JSON.parse(body);
 
-      console.log(`[nb-vite:ssr] Rendering page: ${page.component}`);
+        console.log(`[nb-vite:ssr] Rendering page: ${page.component}`);
 
-      // Load render function (cached after first load)
-      const render = await loadRenderFunction();
+        // Load render function (cached after first load)
+        const render = await loadRenderFunction();
 
-      // Render the page
-      const result = await render(page);
+        // Render the page
+        const result = await render(page);
 
-      // Send response
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        success: true,
-        result: result,
-      }));
+        // Send response
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: true,
+            result: result,
+          }),
+        );
 
-      console.log(`[nb-vite:ssr] Rendered successfully`);
-    } catch (error) {
-      console.error('[nb-vite:ssr] Render error:', error);
+        console.log(`[nb-vite:ssr] Rendered successfully`);
+      } catch (error) {
+        console.error('[nb-vite:ssr] Render error:', error);
 
-      res.statusCode = 500;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        success: false,
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      }));
-    }
-  });
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: {
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+            },
+          }),
+        );
+      }
+    },
+  );
 
-  console.log(`[nb-vite:ssr] SSR endpoint ready at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.path}`);
-  console.log(`[nb-vite:ssr] Health check at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.healthPath}`);
+  console.log(
+    `[nb-vite:ssr] SSR endpoint ready at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.path}`,
+  );
+  console.log(
+    `[nb-vite:ssr] Health check at http://localhost:${viteServer.config.server.port || 5173}${ssrConfig.healthPath}`,
+  );
 
   // Pre-load the render function
   try {
@@ -570,22 +569,20 @@ async function setupSSREndpoint(
   return {
     cleanup: () => {
       // Cleanup if needed
-    }
+    },
   };
 }
 
 /**
  * Resolve the Phoenix plugin.
  */
-function resolvePhoenixPlugin(
-  pluginConfig: Required<PluginConfig>,
-): PhoenixPlugin {
+function resolvePhoenixPlugin(pluginConfig: Required<PluginConfig>): PhoenixPlugin {
   let viteDevServerUrl: DevServerUrl;
   let resolvedConfig: ResolvedConfig;
   let userConfig: UserConfig;
 
   const defaultAliases: Record<string, string> = {
-    "@": path.resolve(process.cwd(), "assets/js"),
+    '@': path.resolve(process.cwd(), 'assets/js'),
   };
 
   // Resolve Phoenix JS library aliases
@@ -595,52 +592,40 @@ function resolvePhoenixPlugin(
   const colocatedAliases = resolvePhoenixColocatedAliases();
 
   return {
-    name: "phoenix",
-    enforce: "post",
+    name: 'phoenix',
+    enforce: 'post',
     config: (config, env) => {
       userConfig = config;
       const ssr = !!userConfig.build?.ssr;
       const rootDirectory = path.resolve(userConfig.root || process.cwd());
-      const environment = loadEnv(
-        env.mode,
-        userConfig.envDir || process.cwd(),
-        "",
-      );
-      const localDependencySupport =
-        resolveLocalPathDependencySupport(rootDirectory);
-      const assetUrl = environment.ASSET_URL ?? "assets";
+      const environment = loadEnv(env.mode, userConfig.envDir || process.cwd(), '');
+      const localDependencySupport = resolveLocalPathDependencySupport(rootDirectory);
+      const assetUrl = environment.ASSET_URL ?? 'assets';
       const serverConfig =
-        env.command === "serve"
-          ? (resolveDevelopmentEnvironmentServerConfig(
-              pluginConfig.detectTls,
-              environment,
-            ) ?? resolveEnvironmentServerConfig(environment))
+        env.command === 'serve'
+          ? (resolveDevelopmentEnvironmentServerConfig(pluginConfig.detectTls, environment) ??
+            resolveEnvironmentServerConfig(environment))
           : undefined;
 
       ensureCommandShouldRunInEnvironment(env.command, environment);
 
       // Warn about common configuration issues
-      if (env.command === "serve") {
+      if (env.command === 'serve') {
         checkCommonConfigurationIssues(pluginConfig, environment, userConfig);
       }
 
       return {
         base:
-          userConfig.base ??
-          (env.command === "build" ? resolveBase(pluginConfig, assetUrl) : ""),
+          userConfig.base ?? (env.command === 'build' ? resolveBase(pluginConfig, assetUrl) : ''),
         publicDir: userConfig.publicDir ?? false,
         build: {
           manifest: userConfig.build?.manifest ?? (ssr ? false : true),
-          ssrManifest:
-            userConfig.build?.ssrManifest ??
-            (ssr ? "ssr-manifest.json" : false),
+          ssrManifest: userConfig.build?.ssrManifest ?? (ssr ? 'ssr-manifest.json' : false),
           outDir: userConfig.build?.outDir ?? resolveOutDir(pluginConfig, ssr),
-          assetsDir: userConfig.build?.assetsDir ?? (ssr ? "" : "."),
+          assetsDir: userConfig.build?.assetsDir ?? (ssr ? '' : '.'),
           emptyOutDir: false,
           rollupOptions: {
-            input:
-              userConfig.build?.rollupOptions?.input ??
-              resolveInput(pluginConfig, ssr),
+            input: userConfig.build?.rollupOptions?.input ?? resolveInput(pluginConfig, ssr),
           },
           assetsInlineLimit: userConfig.build?.assetsInlineLimit ?? 0,
         },
@@ -648,36 +633,28 @@ function resolvePhoenixPlugin(
           alias: [
             ...normalizeAliasEntries(userConfig?.resolve?.alias),
             ...localDependencySupport.aliases,
-            ...Object.entries(defaultAliases).map(
-              ([find, replacement]) => ({ find, replacement }),
-            ),
-            ...Object.entries(phoenixAliases).map(
-              ([find, replacement]) => ({ find, replacement }),
-            ),
-            ...Object.entries(colocatedAliases).map(
-              ([find, replacement]) => ({ find, replacement }),
-            ),
+            ...Object.entries(defaultAliases).map(([find, replacement]) => ({ find, replacement })),
+            ...Object.entries(phoenixAliases).map(([find, replacement]) => ({ find, replacement })),
+            ...Object.entries(colocatedAliases).map(([find, replacement]) => ({
+              find,
+              replacement,
+            })),
           ],
-          dedupe: [
-            ...(userConfig?.resolve?.dedupe || []),
-            ...localDependencySupport.dedupe,
-          ],
+          dedupe: [...(userConfig?.resolve?.dedupe || []), ...localDependencySupport.dedupe],
         },
         ssr: {
           noExternal: noExternalInertiaHelpers(userConfig),
         },
         optimizeDeps: {
           entries: Array.isArray(pluginConfig.input)
-            ? pluginConfig.input.filter(
-                (entry): entry is string => typeof entry === "string",
-              )
-            : typeof pluginConfig.input === "string"
+            ? pluginConfig.input.filter((entry): entry is string => typeof entry === 'string')
+            : typeof pluginConfig.input === 'string'
               ? [pluginConfig.input]
               : undefined,
           include: [
-            "phoenix",
-            "phoenix_html",
-            "phoenix_live_view",
+            'phoenix',
+            'phoenix_html',
+            'phoenix_live_view',
             ...(userConfig?.optimizeDeps?.include || []),
           ],
           exclude: [
@@ -686,8 +663,7 @@ function resolvePhoenixPlugin(
           ],
         },
         server: {
-          origin:
-            userConfig?.server?.origin ?? "http://__nb_vite_placeholder__.test",
+          origin: userConfig?.server?.origin ?? 'http://__nb_vite_placeholder__.test',
           cors: userConfig?.server?.cors ?? {
             origin: userConfig?.server?.origin ?? [
               // Default patterns for localhost (IPv4, IPv6)
@@ -695,8 +671,8 @@ function resolvePhoenixPlugin(
               // Phoenix app URL from environment
               ...(environment.PHX_HOST
                 ? [
-                    environment.PHX_HOST.startsWith("http://") ||
-                    environment.PHX_HOST.startsWith("https://")
+                    environment.PHX_HOST.startsWith('http://') ||
+                    environment.PHX_HOST.startsWith('https://')
                       ? environment.PHX_HOST
                       : `http://${environment.PHX_HOST}`,
                   ]
@@ -715,12 +691,10 @@ function resolvePhoenixPlugin(
           // Handle Docker/container environments
           ...(environment.PHOENIX_DOCKER || environment.DOCKER_ENV
             ? {
-                host: userConfig?.server?.host ?? "0.0.0.0",
+                host: userConfig?.server?.host ?? '0.0.0.0',
                 port:
                   userConfig?.server?.port ??
-                  (environment.VITE_PORT
-                    ? parseInt(environment.VITE_PORT)
-                    : 5173),
+                  (environment.VITE_PORT ? parseInt(environment.VITE_PORT) : 5173),
                 strictPort: userConfig?.server?.strictPort ?? true,
               }
             : undefined),
@@ -732,21 +706,19 @@ function resolvePhoenixPlugin(
                     ? false
                     : {
                         ...serverConfig.hmr,
-                        ...(userConfig?.server?.hmr === true
-                          ? {}
-                          : userConfig?.server?.hmr),
+                        ...(userConfig?.server?.hmr === true ? {} : userConfig?.server?.hmr),
                       },
                 https: userConfig?.server?.https ?? serverConfig.https,
               }
             : {
                 // Use 127.0.0.1 to ensure IPv4 binding for Erlang :httpc compatibility
                 // On macOS, "localhost" resolves to IPv6 (::1) which :httpc can't connect to
-                host: userConfig?.server?.host ?? "127.0.0.1",
+                host: userConfig?.server?.host ?? '127.0.0.1',
                 hmr:
                   userConfig?.server?.hmr === false
                     ? false
                     : {
-                        ...(typeof userConfig?.server?.hmr === "object"
+                        ...(typeof userConfig?.server?.hmr === 'object'
                           ? userConfig.server.hmr
                           : {}),
                       },
@@ -758,11 +730,8 @@ function resolvePhoenixPlugin(
       resolvedConfig = config;
     },
     transform(code) {
-      if (resolvedConfig.command === "serve") {
-        code = code.replace(
-          /http:\/\/__nb_vite_placeholder__\.test/g,
-          viteDevServerUrl,
-        );
+      if (resolvedConfig.command === 'serve') {
+        code = code.replace(/http:\/\/__nb_vite_placeholder__\.test/g, viteDevServerUrl);
 
         if (pluginConfig.transformOnServe) {
           return pluginConfig.transformOnServe(code, viteDevServerUrl);
@@ -773,30 +742,28 @@ function resolvePhoenixPlugin(
     },
     async configureServer(server) {
       const envDir = server.config.envDir || process.cwd();
-      const phxHost =
-        loadEnv(server.config.mode, envDir, "PHX_HOST").PHX_HOST ?? "localhost:4000";
+      const phxHost = loadEnv(server.config.mode, envDir, 'PHX_HOST').PHX_HOST ?? 'localhost:4000';
 
       // Setup SSR if enabled
-      const ssrSetup =
-        typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.enabled
-          ? await setupSSREndpoint(server, pluginConfig.ssrDev as Required<SSRConfig>)
-          : null;
+      if (typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.enabled) {
+        await setupSSREndpoint(server, pluginConfig.ssrDev as Required<SSRConfig>);
+      }
 
-      server.httpServer?.once("listening", () => {
+      server.httpServer?.once('listening', () => {
         const address = server.httpServer?.address();
 
-        const isAddressInfo = (
-          x: string | AddressInfo | null | undefined,
-        ): x is AddressInfo => typeof x === "object";
+        const isAddressInfo = (x: string | AddressInfo | null | undefined): x is AddressInfo =>
+          typeof x === 'object';
         if (isAddressInfo(address)) {
           // Support empty string origin for relative URLs (works with reverse proxies)
-          viteDevServerUrl = userConfig.server?.origin !== undefined
-            ? (userConfig.server.origin as DevServerUrl)
-            : resolveDevServerUrl(address, server.config, userConfig);
+          viteDevServerUrl =
+            userConfig.server?.origin !== undefined
+              ? (userConfig.server.origin as DevServerUrl)
+              : resolveDevServerUrl(address, server.config, userConfig);
 
           // Write hot file with error handling
           try {
-            const hotContent = `${viteDevServerUrl}${server.config.base.replace(/\/$/, "")}`;
+            const hotContent = `${viteDevServerUrl}${server.config.base.replace(/\/$/, '')}`;
             const hotDir = path.dirname(pluginConfig.hotFile);
 
             if (!fs.existsSync(hotDir)) {
@@ -806,15 +773,17 @@ function resolvePhoenixPlugin(
             fs.writeFileSync(pluginConfig.hotFile, hotContent);
 
             if (process.env.DEBUG || process.env.VERBOSE) {
-              console.log(
-                colors.dim(`Hot file written to: ${pluginConfig.hotFile}`),
-              );
+              console.log(colors.dim(`Hot file written to: ${pluginConfig.hotFile}`));
             }
 
             // Write SSR hot file if SSR is enabled
-            if (typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.enabled && pluginConfig.ssrDev.hotFile) {
+            if (
+              typeof pluginConfig.ssrDev === 'object' &&
+              pluginConfig.ssrDev.enabled &&
+              pluginConfig.ssrDev.hotFile
+            ) {
               try {
-                const ssrUrl = `${viteDevServerUrl}${server.config.base.replace(/\/$/, "")}${pluginConfig.ssrDev.path}`;
+                const ssrUrl = `${viteDevServerUrl}${server.config.base.replace(/\/$/, '')}${pluginConfig.ssrDev.path}`;
                 const ssrHotDir = path.dirname(pluginConfig.ssrDev.hotFile);
 
                 if (!fs.existsSync(ssrHotDir)) {
@@ -831,7 +800,7 @@ function resolvePhoenixPlugin(
               } catch (error) {
                 console.error(
                   `
-[nb-vite] ${colors.red("Error")}: Failed to write SSR hot file.\n` +
+[nb-vite] ${colors.red('Error')}: Failed to write SSR hot file.\n` +
                     `Path: ${typeof pluginConfig.ssrDev === 'object' ? pluginConfig.ssrDev.hotFile : 'unknown'}\n` +
                     `Error: ${error instanceof Error ? error.message : String(error)}\n`,
                 );
@@ -840,7 +809,7 @@ function resolvePhoenixPlugin(
           } catch (error) {
             console.error(
               `
-[nb-vite] ${colors.red("Error")}: Failed to write hot file.\n` +
+[nb-vite] ${colors.red('Error')}: Failed to write hot file.\n` +
                 `Path: ${pluginConfig.hotFile}\n` +
                 `Error: ${error instanceof Error ? error.message : String(error)}\n` +
                 `This may prevent Phoenix from detecting the Vite dev server.\n`,
@@ -852,41 +821,39 @@ function resolvePhoenixPlugin(
             const pluginVer = pluginVersion();
 
             server.config.logger.info(
-              `\n  ${colors.red(`${colors.bold("PHOENIX")} ${phoenixVer !== "unknown" ? phoenixVer : ""}`)}  ${colors.dim("plugin")} ${colors.bold(`v${pluginVer}`)}`,
+              `\n  ${colors.red(`${colors.bold('PHOENIX')} ${phoenixVer !== 'unknown' ? phoenixVer : ''}`)}  ${colors.dim('plugin')} ${colors.bold(`v${pluginVer}`)}`,
             );
-            server.config.logger.info("");
+            server.config.logger.info('');
             server.config.logger.info(
-              `  ${colors.green("➜")}  ${colors.bold("PHX_HOST")}: ${colors.cyan(phxHost.replace(/:(\d+)/, (_, port) => `:${colors.bold(port)}`))}`,
+              `  ${colors.green('➜')}  ${colors.bold('PHX_HOST')}: ${colors.cyan(phxHost.replace(/:(\d+)/, (_, port) => `:${colors.bold(port)}`))}`,
             );
 
             if (
-              typeof resolvedConfig.server.https === "object" &&
-              typeof resolvedConfig.server.https.key === "string"
+              typeof resolvedConfig.server.https === 'object' &&
+              typeof resolvedConfig.server.https.key === 'string'
             ) {
               // Log certificate source with detailed info
               if (pluginConfig.detectTls) {
-                if (resolvedConfig.server.https.key.includes("mkcert")) {
+                if (resolvedConfig.server.https.key.includes('mkcert')) {
                   server.config.logger.info(
-                    `  ${colors.green("➜")}  Using mkcert certificate to secure Vite.`,
+                    `  ${colors.green('➜')}  Using mkcert certificate to secure Vite.`,
                   );
-                } else if (resolvedConfig.server.https.key.includes("caddy")) {
+                } else if (resolvedConfig.server.https.key.includes('caddy')) {
                   server.config.logger.info(
-                    `  ${colors.green("➜")}  Using Caddy certificate to secure Vite.`,
+                    `  ${colors.green('➜')}  Using Caddy certificate to secure Vite.`,
                   );
-                } else if (
-                  resolvedConfig.server.https.key.includes("priv/cert")
-                ) {
+                } else if (resolvedConfig.server.https.key.includes('priv/cert')) {
                   server.config.logger.info(
-                    `  ${colors.green("➜")}  Using project certificate to secure Vite.`,
+                    `  ${colors.green('➜')}  Using project certificate to secure Vite.`,
                   );
                 } else {
                   server.config.logger.info(
-                    `  ${colors.green("➜")}  Using custom certificate to secure Vite.`,
+                    `  ${colors.green('➜')}  Using custom certificate to secure Vite.`,
                   );
                 }
               } else {
                 server.config.logger.info(
-                  `  ${colors.green("➜")}  Using TLS certificate to secure Vite.`,
+                  `  ${colors.green('➜')}  Using TLS certificate to secure Vite.`,
                 );
               }
             }
@@ -901,15 +868,15 @@ function resolvePhoenixPlugin(
                 : 0;
               if (refreshCount > 0) {
                 server.config.logger.info(
-                  `  ${colors.green("➜")}  Full reload enabled for ${refreshCount} file pattern(s)`,
+                  `  ${colors.green('➜')}  Full reload enabled for ${refreshCount} file pattern(s)`,
                 );
               }
             }
 
             // Log the development server URL last
-            server.config.logger.info("");
+            server.config.logger.info('');
             server.config.logger.info(
-              `  ${colors.green("➜")}  ${colors.bold("Dev Server")}: ${colors.cyan(viteDevServerUrl.replace(/:(\d+)/, (_, port: string) => `:${colors.bold(port)}`))}\n`,
+              `  ${colors.green('➜')}  ${colors.bold('Dev Server')}: ${colors.cyan(viteDevServerUrl.replace(/:(\d+)/, (_, port: string) => `:${colors.bold(port)}`))}\n`,
             );
           }, 100);
         }
@@ -921,9 +888,7 @@ function resolvePhoenixPlugin(
             try {
               fs.rmSync(pluginConfig.hotFile);
               if (process.env.DEBUG || process.env.VERBOSE) {
-                console.log(
-                  colors.dim(`Hot file cleaned up: ${pluginConfig.hotFile}`),
-                );
+                console.log(colors.dim(`Hot file cleaned up: ${pluginConfig.hotFile}`));
               }
             } catch (error) {
               // Ignore cleanup errors - the file might already be deleted
@@ -938,13 +903,15 @@ function resolvePhoenixPlugin(
           }
 
           // Clean up SSR hot file if it exists
-          if (typeof pluginConfig.ssrDev === 'object' && pluginConfig.ssrDev.hotFile && fs.existsSync(pluginConfig.ssrDev.hotFile)) {
+          if (
+            typeof pluginConfig.ssrDev === 'object' &&
+            pluginConfig.ssrDev.hotFile &&
+            fs.existsSync(pluginConfig.ssrDev.hotFile)
+          ) {
             try {
               fs.rmSync(pluginConfig.ssrDev.hotFile);
               if (process.env.DEBUG || process.env.VERBOSE) {
-                console.log(
-                  colors.dim(`SSR hot file cleaned up: ${pluginConfig.ssrDev.hotFile}`),
-                );
+                console.log(colors.dim(`SSR hot file cleaned up: ${pluginConfig.ssrDev.hotFile}`));
               }
             } catch (error) {
               if (process.env.DEBUG || process.env.VERBOSE) {
@@ -958,20 +925,18 @@ function resolvePhoenixPlugin(
           }
         };
 
-        process.on("exit", clean);
-        process.on("SIGINT", () => {
-          console.log(colors.dim("\nShutting down Vite..."));
+        process.on('exit', clean);
+        process.on('SIGINT', () => {
+          console.log(colors.dim('\nShutting down Vite...'));
           process.exit();
         });
-        process.on("SIGTERM", () => process.exit());
-        process.on("SIGHUP", () => process.exit());
+        process.on('SIGTERM', () => process.exit());
+        process.on('SIGHUP', () => process.exit());
 
         // Terminate the watcher when Phoenix quits
-        process.stdin.on("close", () => {
+        process.stdin.on('close', () => {
           if (process.env.DEBUG || process.env.VERBOSE) {
-            console.log(
-              colors.dim("Phoenix process closed, shutting down Vite..."),
-            );
+            console.log(colors.dim('Phoenix process closed, shutting down Vite...'));
           }
           process.exit(0);
         });
@@ -982,14 +947,12 @@ function resolvePhoenixPlugin(
 
       return () =>
         server.middlewares.use((req, res, next) => {
-          if (req.url === "/index.html") {
+          if (req.url === '/index.html') {
             res.statusCode = 404;
 
             res.end(
               fs
-                .readFileSync(
-                  new URL("./dev-server-index.html", import.meta.url),
-                )
+                .readFileSync(new URL('./dev-server-index.html', import.meta.url))
                 .toString()
                 .replace(/{{ PHOENIX_VERSION }}/g, phoenixVersion()),
             );
@@ -1004,23 +967,17 @@ function resolvePhoenixPlugin(
       if (!resolvedConfig.build.ssr) {
         try {
           // Read Vite's generated manifest
-          const viteManifestPath = path.join(
-            resolvedConfig.build.outDir,
-            ".vite",
-            "manifest.json"
-          );
+          const viteManifestPath = path.join(resolvedConfig.build.outDir, '.vite', 'manifest.json');
 
           if (!fs.existsSync(viteManifestPath)) {
             console.warn(
               `
-[nb-vite] ${colors.yellow("Warning")}: Vite manifest not found at ${viteManifestPath}\n`
+[nb-vite] ${colors.yellow('Warning')}: Vite manifest not found at ${viteManifestPath}\n`,
             );
             return;
           }
 
-          const viteManifest = JSON.parse(
-            fs.readFileSync(viteManifestPath, "utf-8")
-          ) as Manifest;
+          const viteManifest = JSON.parse(fs.readFileSync(viteManifestPath, 'utf-8')) as Manifest;
 
           // Transform Vite's manifest to add the buildDirectory prefix to file paths
           const manifest = {} as Manifest;
@@ -1036,14 +993,14 @@ function resolvePhoenixPlugin(
             // Transform CSS array
             if (entry.css && Array.isArray(entry.css)) {
               transformedEntry.css = entry.css.map(
-                (css) => `${pluginConfig.buildDirectory}/${css}`
+                (css) => `${pluginConfig.buildDirectory}/${css}`,
               );
             }
 
             // Transform assets array
             if (entry.assets && Array.isArray(entry.assets)) {
               transformedEntry.assets = entry.assets.map(
-                (asset) => `${pluginConfig.buildDirectory}/${asset}`
+                (asset) => `${pluginConfig.buildDirectory}/${asset}`,
               );
             }
 
@@ -1056,9 +1013,7 @@ function resolvePhoenixPlugin(
           // Ensure manifest directory exists
           if (!fs.existsSync(manifestDir)) {
             if (process.env.DEBUG || process.env.VERBOSE) {
-              console.log(
-                colors.dim(`Creating manifest directory: ${manifestDir}`),
-              );
+              console.log(colors.dim(`Creating manifest directory: ${manifestDir}`));
             }
             fs.mkdirSync(manifestDir, { recursive: true });
           }
@@ -1066,17 +1021,13 @@ function resolvePhoenixPlugin(
           fs.writeFileSync(pluginConfig.manifestPath, manifestContent);
 
           if (process.env.DEBUG || process.env.VERBOSE) {
-            console.log(
-              colors.dim(`Manifest written to: ${pluginConfig.manifestPath}`),
-            );
-            console.log(
-              colors.dim(`Manifest entries: ${Object.keys(manifest).length}`),
-            );
+            console.log(colors.dim(`Manifest written to: ${pluginConfig.manifestPath}`));
+            console.log(colors.dim(`Manifest entries: ${Object.keys(manifest).length}`));
           }
         } catch (error) {
           console.error(
             `
-[nb-vite] ${colors.red("Error")}: Failed to generate manifest file.\n` +
+[nb-vite] ${colors.red('Error')}: Failed to generate manifest file.\n` +
               `Path: ${pluginConfig.manifestPath}\n` +
               `Error: ${error instanceof Error ? error.message : String(error)}\n`,
           );
@@ -1099,64 +1050,59 @@ function checkCommonConfigurationIssues(
   if (!env.PHX_HOST) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: PHX_HOST environment variable is not set.\n` +
+[nb-vite] ${colors.yellow('Warning')}: PHX_HOST environment variable is not set.\n` +
         `This may cause CORS issues when accessing your Phoenix app.\n` +
         `Set it in your .env file or shell: export PHX_HOST=localhost:4000\n`,
     );
   }
 
   // Check for potential port conflicts
-  const vitePort =
-    userConfig.server?.port ?? (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173);
+  const vitePort = userConfig.server?.port ?? (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173);
   if (env.PHX_HOST && env.PHX_HOST.includes(`:${vitePort}`)) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: PHX_HOST (${env.PHX_HOST}) is using the same port as Vite (${vitePort}).\n` +
+[nb-vite] ${colors.yellow('Warning')}: PHX_HOST (${env.PHX_HOST}) is using the same port as Vite (${vitePort}).\n` +
         `This will cause conflicts. Phoenix and Vite must run on different ports.\n`,
     );
   }
 
   // Check if running in WSL without proper host configuration
-  if (
-    process.platform === "linux" &&
-    env.WSL_DISTRO_NAME &&
-    !userConfig.server?.host
-  ) {
+  if (process.platform === 'linux' && env.WSL_DISTRO_NAME && !userConfig.server?.host) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: Running in WSL without explicit host configuration.\n` +
+[nb-vite] ${colors.yellow('Warning')}: Running in WSL without explicit host configuration.\n` +
         `You may need to set server.host to '0.0.0.0' in your vite.config.js for proper access from Windows.\n`,
     );
   }
 
   // Check for missing Phoenix dependencies
-  const depsPath = path.resolve(process.cwd(), "../deps");
+  const depsPath = path.resolve(process.cwd(), '../deps');
   if (!fs.existsSync(depsPath)) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: Phoenix deps directory not found at ${depsPath}.\n` +
+[nb-vite] ${colors.yellow('Warning')}: Phoenix deps directory not found at ${depsPath}.\n` +
         `Make sure you're running Vite from the correct directory (usually the 'assets' folder).\n` +
         `If you're building in Docker, ensure the deps are available at build time.\n`,
     );
   }
 
   // Check for critical node_modules that might cause config loading to fail
-  const nodeModulesPath = path.resolve(process.cwd(), "node_modules");
+  const nodeModulesPath = path.resolve(process.cwd(), 'node_modules');
   if (!fs.existsSync(nodeModulesPath)) {
     console.error(
       `
-[nb-vite] ${colors.red("Error")}: node_modules directory not found.\n` +
-        `Run 'npm install' (or yarn/pnpm/bun install) before building.\n` +
+[nb-vite] ${colors.red('Error')}: node_modules directory not found.\n` +
+        `Run 'vp install' from the assets directory before building.\n` +
         `If you're building in Docker, ensure dependencies are installed in your Dockerfile before running the build.\n`,
     );
   } else {
     // Check for critical Vite dependency
-    const vitePath = path.resolve(nodeModulesPath, "vite");
+    const vitePath = path.resolve(nodeModulesPath, 'vite');
     if (!fs.existsSync(vitePath)) {
       console.error(
         `
-[nb-vite] ${colors.red("Error")}: Vite is not installed in node_modules.\n` +
-          `Run 'npm install vite' to install it.\n` +
+[nb-vite] ${colors.red('Error')}: Vite is not installed in node_modules.\n` +
+          `Run 'vp add -D vite-plus' to install the Vite+ toolchain.\n` +
           `If you're using a workspace setup in Docker, ensure all dependencies are properly hoisted.\n`,
       );
     }
@@ -1167,7 +1113,7 @@ function checkCommonConfigurationIssues(
   if (!fs.existsSync(hotFileDir)) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: Hot file directory "${hotFileDir}" does not exist.\n` +
+[nb-vite] ${colors.yellow('Warning')}: Hot file directory "${hotFileDir}" does not exist.\n` +
         `Creating directory to prevent errors...\n`,
     );
     fs.mkdirSync(hotFileDir, { recursive: true });
@@ -1178,28 +1124,21 @@ function checkCommonConfigurationIssues(
     pluginConfig.reactRefresh &&
     !userConfig.plugins?.some(
       (p) =>
-        typeof p === "object" &&
-        p !== null &&
-        "name" in p &&
-        p.name === "@vitejs/plugin-react",
+        typeof p === 'object' && p !== null && 'name' in p && p.name === '@vitejs/plugin-react',
     )
   ) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: reactRefresh is enabled but @vitejs/plugin-react is not detected.\n` +
+[nb-vite] ${colors.yellow('Warning')}: reactRefresh is enabled but @vitejs/plugin-react is not detected.\n` +
         `Install and configure @vitejs/plugin-react for React refresh to work properly.\n`,
     );
   }
 
   // Warn about SSL in non-development environments
-  if (
-    env.MIX_ENV &&
-    env.MIX_ENV !== "dev" &&
-    (pluginConfig.detectTls || env.VITE_DEV_SERVER_KEY)
-  ) {
+  if (env.MIX_ENV && env.MIX_ENV !== 'dev' && (pluginConfig.detectTls || env.VITE_DEV_SERVER_KEY)) {
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: TLS/SSL is configured but MIX_ENV is set to "${env.MIX_ENV}".\n` +
+[nb-vite] ${colors.yellow('Warning')}: TLS/SSL is configured but MIX_ENV is set to "${env.MIX_ENV}".\n` +
         `TLS is typically only needed in development. Consider disabling it for other environments.\n`,
     );
   }
@@ -1209,104 +1148,82 @@ function checkCommonConfigurationIssues(
  * Validate the command can run in the given environment.
  */
 function ensureCommandShouldRunInEnvironment(
-  command: "build" | "serve",
+  command: 'build' | 'serve',
   env: Record<string, string>,
 ): void {
-  if (command === "build" || env.PHOENIX_BYPASS_ENV_CHECK === "1") {
+  if (command === 'build' || env.PHOENIX_BYPASS_ENV_CHECK === '1') {
     return;
   }
 
   // Check for CI environments
-  if (typeof env.CI !== "undefined") {
+  if (typeof env.CI !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server in CI environments. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server in CI environments. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for production deployment indicators
-  if (env.MIX_ENV === "prod" || env.NODE_ENV === "production") {
+  if (env.MIX_ENV === 'prod' || env.NODE_ENV === 'production') {
     throw new Error(
-      "You should not run the Vite HMR server in production. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server in production. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for Fly.io deployment
-  if (typeof env.FLY_APP_NAME !== "undefined") {
+  if (typeof env.FLY_APP_NAME !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server on Fly.io. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server on Fly.io. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for Gigalixir deployment
-  if (typeof env.GIGALIXIR_APP_NAME !== "undefined") {
+  if (typeof env.GIGALIXIR_APP_NAME !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server on Gigalixir. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server on Gigalixir. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for Heroku deployment
-  if (
-    typeof env.DYNO !== "undefined" &&
-    typeof env.HEROKU_APP_NAME !== "undefined"
-  ) {
+  if (typeof env.DYNO !== 'undefined' && typeof env.HEROKU_APP_NAME !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server on Heroku. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server on Heroku. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for Render deployment
-  if (typeof env.RENDER !== "undefined") {
+  if (typeof env.RENDER !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server on Render. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server on Render. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for Railway deployment
-  if (typeof env.RAILWAY_ENVIRONMENT !== "undefined") {
+  if (typeof env.RAILWAY_ENVIRONMENT !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server on Railway. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server on Railway. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for running in ExUnit tests
-  if (
-    env.MIX_ENV === "test" &&
-    typeof env.PHOENIX_INTEGRATION_TEST === "undefined"
-  ) {
+  if (env.MIX_ENV === 'test' && typeof env.PHOENIX_INTEGRATION_TEST === 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server in the test environment. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1 or PHOENIX_INTEGRATION_TEST=1 for integration tests that need the dev server.",
+      'You should not run the Vite HMR server in the test environment. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1 or PHOENIX_INTEGRATION_TEST=1 for integration tests that need the dev server.',
     );
   }
 
   // Check for Docker production environments
-  if (
-    typeof env.DOCKER_ENV !== "undefined" &&
-    env.DOCKER_ENV === "production"
-  ) {
+  if (typeof env.DOCKER_ENV !== 'undefined' && env.DOCKER_ENV === 'production') {
     throw new Error(
-      "You should not run the Vite HMR server in production Docker containers. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server in production Docker containers. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
 
   // Check for release mode
-  if (
-    typeof env.RELEASE_NAME !== "undefined" ||
-    typeof env.RELEASE_NODE !== "undefined"
-  ) {
+  if (typeof env.RELEASE_NAME !== 'undefined' || typeof env.RELEASE_NODE !== 'undefined') {
     throw new Error(
-      "You should not run the Vite HMR server in an Elixir release. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1",
+      'You should not run the Vite HMR server in an Elixir release. You should build your assets for production instead. To disable this ENV check you may set PHOENIX_BYPASS_ENV_CHECK=1',
     );
   }
-}
-
-function toPhoenixAssetPath(filename: string) {
-  filename = path.relative(process.cwd(), filename);
-
-  if (filename.startsWith("assets/")) {
-    filename = filename.slice("assets/".length);
-  }
-
-  return filename;
 }
 
 /**
@@ -1316,14 +1233,14 @@ function phoenixVersion(): string {
   try {
     // Try to find mix.exs in common locations
     const possiblePaths = [
-      path.join(process.cwd(), "mix.exs"),
-      path.join(process.cwd(), "../mix.exs"),
-      path.join(process.cwd(), "../../mix.exs"),
+      path.join(process.cwd(), 'mix.exs'),
+      path.join(process.cwd(), '../mix.exs'),
+      path.join(process.cwd(), '../../mix.exs'),
     ];
 
     for (const mixExsPath of possiblePaths) {
       if (fs.existsSync(mixExsPath)) {
-        const content = fs.readFileSync(mixExsPath, "utf-8");
+        const content = fs.readFileSync(mixExsPath, 'utf-8');
         // Look for app version
         const versionMatch = content.match(/version:\s*"([^"]+)"/);
         if (versionMatch) {
@@ -1346,7 +1263,7 @@ function phoenixVersion(): string {
     }
   }
 
-  return "unknown";
+  return 'unknown';
 }
 
 /**
@@ -1357,23 +1274,23 @@ function pluginVersion(): string {
     const currentDir = path.dirname(new URL(import.meta.url).pathname);
     // Try different paths to find package.json
     const possiblePaths = [
-      path.join(currentDir, "package.json"),      // When running from priv/static/nb_vite/ (distributed)
-      path.join(currentDir, "../package.json"),   // When running from dist/ (during build)
-      path.join(currentDir, "../../package.json"), // When running from src/ (development)
+      path.join(currentDir, 'package.json'), // When running from priv/static/nb_vite/ (distributed)
+      path.join(currentDir, '../package.json'), // When running from dist/ (during build)
+      path.join(currentDir, '../../package.json'), // When running from src/ (development)
     ];
 
     for (const packageJsonPath of possiblePaths) {
       if (fs.existsSync(packageJsonPath)) {
-        const packageJson = JSON.parse(
-          fs.readFileSync(packageJsonPath).toString(),
-        ) as { version?: string };
-        return packageJson.version || "unknown";
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath).toString()) as {
+          version?: string;
+        };
+        return packageJson.version || 'unknown';
       }
     }
   } catch {
     // Ignore errors
   }
-  return "unknown";
+  return 'unknown';
 }
 
 function normalizeAliasEntries(
@@ -1387,9 +1304,10 @@ function normalizeAliasEntries(
     return aliases as Array<{ find: string | RegExp; replacement: string }>;
   }
 
-  return Object.entries(aliases as Record<string, string>).map(
-    ([find, replacement]) => ({ find, replacement }),
-  );
+  return Object.entries(aliases as Record<string, string>).map(([find, replacement]) => ({
+    find,
+    replacement,
+  }));
 }
 
 function mergeServerFsAllow(
@@ -1406,31 +1324,27 @@ function mergeServerFsAllow(
   const existingAllow = Array.isArray(existingFs?.allow) ? existingFs.allow : [];
 
   return {
-    ...(existingFs && typeof existingFs === "object" ? existingFs : {}),
+    ...(existingFs && typeof existingFs === 'object' ? existingFs : {}),
     allow: [...new Set([...defaultAllow, ...existingAllow, ...localAllow])],
   };
 }
 
-function resolveLocalPathDependencySupport(
-  rootDirectory: string,
-): LocalDependencySupport {
-  const packageJsonPath = path.join(rootDirectory, "package.json");
+function resolveLocalPathDependencySupport(rootDirectory: string): LocalDependencySupport {
+  const packageJsonPath = path.join(rootDirectory, 'package.json');
 
   if (!fs.existsSync(packageJsonPath)) {
     return { aliases: [], fsAllow: [], dedupe: [], optimizeDepsExclude: [] };
   }
 
   try {
-    const packageJson = JSON.parse(
-      fs.readFileSync(packageJsonPath, "utf-8"),
-    ) as {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
 
     const allDependencies = {
-      ...(packageJson.dependencies || {}),
-      ...(packageJson.devDependencies || {}),
+      ...packageJson.dependencies,
+      ...packageJson.devDependencies,
     };
 
     const aliases: Array<{ find: string | RegExp; replacement: string }> = [];
@@ -1446,14 +1360,14 @@ function resolveLocalPathDependencySupport(
       }
 
       const dependencyRoot = fs.realpathSync(localDependencyPath);
-      const dependencyPackageJsonPath = path.join(dependencyRoot, "package.json");
+      const dependencyPackageJsonPath = path.join(dependencyRoot, 'package.json');
 
       if (!fs.existsSync(dependencyPackageJsonPath)) {
         continue;
       }
 
       const dependencyPackageJson = JSON.parse(
-        fs.readFileSync(dependencyPackageJsonPath, "utf-8"),
+        fs.readFileSync(dependencyPackageJsonPath, 'utf-8'),
       ) as {
         exports?: unknown;
         main?: string;
@@ -1496,19 +1410,16 @@ function resolveLocalPathDependencySupport(
   }
 }
 
-function resolveLocalDependencyPath(
-  rootDirectory: string,
-  spec: string,
-): string | null {
+function resolveLocalDependencyPath(rootDirectory: string, spec: string): string | null {
   let normalizedSpec = spec;
 
-  if (normalizedSpec.startsWith("file:")) {
-    normalizedSpec = normalizedSpec.slice("file:".length);
-  } else if (normalizedSpec.startsWith("link:")) {
-    normalizedSpec = normalizedSpec.slice("link:".length);
+  if (normalizedSpec.startsWith('file:')) {
+    normalizedSpec = normalizedSpec.slice('file:'.length);
+  } else if (normalizedSpec.startsWith('link:')) {
+    normalizedSpec = normalizedSpec.slice('link:'.length);
   } else if (
-    !normalizedSpec.startsWith("./") &&
-    !normalizedSpec.startsWith("../") &&
+    !normalizedSpec.startsWith('./') &&
+    !normalizedSpec.startsWith('../') &&
     !path.isAbsolute(normalizedSpec)
   ) {
     return null;
@@ -1530,7 +1441,7 @@ function resolveLocalDependencyAliases(
   const seen = new Set<string>();
 
   const pushAlias = (find: string, target: string | null) => {
-    if (!target || seen.has(find) || target.includes("*")) {
+    if (!target || seen.has(find) || target.includes('*')) {
       return;
     }
 
@@ -1543,22 +1454,19 @@ function resolveLocalDependencyAliases(
 
   const exportsField = dependencyPackageJson.exports;
 
-  if (typeof exportsField === "string") {
+  if (typeof exportsField === 'string') {
     pushAlias(packageName, exportsField);
-  } else if (exportsField && typeof exportsField === "object") {
+  } else if (exportsField && typeof exportsField === 'object') {
     const directTarget = resolveExportTarget(exportsField);
     pushAlias(packageName, directTarget);
 
     for (const [exportPath, exportValue] of Object.entries(exportsField)) {
-      if (!exportPath.startsWith(".") || exportPath.includes("*")) {
+      if (!exportPath.startsWith('.') || exportPath.includes('*')) {
         continue;
       }
 
       const target = resolveExportTarget(exportValue);
-      const specifier =
-        exportPath === "."
-          ? packageName
-          : `${packageName}/${exportPath.slice(2)}`;
+      const specifier = exportPath === '.' ? packageName : `${packageName}/${exportPath.slice(2)}`;
 
       pushAlias(specifier, target);
     }
@@ -1572,25 +1480,25 @@ function resolveLocalDependencyAliases(
 }
 
 function resolveExportTarget(exportValue: unknown): string | null {
-  if (typeof exportValue === "string") {
+  if (typeof exportValue === 'string') {
     return exportValue;
   }
 
-  if (!exportValue || typeof exportValue !== "object" || Array.isArray(exportValue)) {
+  if (!exportValue || typeof exportValue !== 'object' || Array.isArray(exportValue)) {
     return null;
   }
 
   const conditions = exportValue as Record<string, unknown>;
 
-  if (typeof conditions.import === "string") {
+  if (typeof conditions.import === 'string') {
     return conditions.import;
   }
 
-  if (typeof conditions.default === "string") {
+  if (typeof conditions.default === 'string') {
     return conditions.default;
   }
 
-  if (typeof conditions.module === "string") {
+  if (typeof conditions.module === 'string') {
     return conditions.module;
   }
 
@@ -1598,17 +1506,15 @@ function resolveExportTarget(exportValue: unknown): string | null {
 }
 
 function escapeForRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function resolveFullReloadConfig({
-  refresh: config,
-}: Required<PluginConfig>): PluginOption[] {
-  if (typeof config === "boolean") {
+function resolveFullReloadConfig({ refresh: config }: Required<PluginConfig>): PluginOption[] {
+  if (typeof config === 'boolean') {
     return [];
   }
 
-  if (typeof config === "string") {
+  if (typeof config === 'string') {
     config = [{ paths: [config] }];
   }
 
@@ -1616,7 +1522,7 @@ function resolveFullReloadConfig({
     config = [config];
   }
 
-  if (config.some((c) => typeof c === "string")) {
+  if (config.some((c) => typeof c === 'string')) {
     config = [{ paths: config }] as RefreshConfig[];
   }
 
@@ -1649,7 +1555,7 @@ function resolveEnvironmentServerConfig(env: Record<string, string>):
   if (!env.VITE_DEV_SERVER_KEY || !env.VITE_DEV_SERVER_CERT) {
     throw new Error(
       `Phoenix Vite Plugin: Both VITE_DEV_SERVER_KEY and VITE_DEV_SERVER_CERT must be provided. ` +
-        `Currently provided: KEY=${env.VITE_DEV_SERVER_KEY ? "✓" : "✗"}, CERT=${env.VITE_DEV_SERVER_CERT ? "✓" : "✗"}`,
+        `Currently provided: KEY=${env.VITE_DEV_SERVER_KEY ? '✓' : '✗'}, CERT=${env.VITE_DEV_SERVER_CERT ? '✓' : '✗'}`,
     );
   }
 
@@ -1659,16 +1565,14 @@ function resolveEnvironmentServerConfig(env: Record<string, string>):
     missingFiles.push(`Key file not found: ${env.VITE_DEV_SERVER_KEY}`);
   }
   if (!fs.existsSync(env.VITE_DEV_SERVER_CERT)) {
-    missingFiles.push(
-      `Certificate file not found: ${env.VITE_DEV_SERVER_CERT}`,
-    );
+    missingFiles.push(`Certificate file not found: ${env.VITE_DEV_SERVER_CERT}`);
   }
 
   if (missingFiles.length > 0) {
     throw new Error(
       `Phoenix Vite Plugin: Unable to find the certificate files specified in your environment.\n` +
-        missingFiles.join("\n") +
-        "\n" +
+        missingFiles.join('\n') +
+        '\n' +
         `Please ensure the paths are correct and the files exist.`,
     );
   }
@@ -1678,7 +1582,7 @@ function resolveEnvironmentServerConfig(env: Record<string, string>):
   if (!host) {
     throw new Error(
       `Phoenix Vite Plugin: Unable to determine the host from the environment.\n` +
-        `PHX_HOST is set to: ${env.PHX_HOST ? `"${env.PHX_HOST}"` : "(not set)"}\n` +
+        `PHX_HOST is set to: ${env.PHX_HOST ? `"${env.PHX_HOST}"` : '(not set)'}\n` +
         `Please set PHX_HOST to a valid hostname or URL (e.g., "localhost", "myapp.test", or "https://myapp.test").`,
     );
   }
@@ -1701,10 +1605,7 @@ function resolveHostFromEnv(env: Record<string, string>): string | undefined {
   if (env.PHX_HOST) {
     try {
       // If PHX_HOST contains a full URL, extract the host
-      if (
-        env.PHX_HOST.startsWith("http://") ||
-        env.PHX_HOST.startsWith("https://")
-      ) {
+      if (env.PHX_HOST.startsWith('http://') || env.PHX_HOST.startsWith('https://')) {
         return new URL(env.PHX_HOST).host;
       }
       // Otherwise, use it as is
@@ -1725,28 +1626,23 @@ function resolveDevServerUrl(
   userConfig: UserConfig,
 ): DevServerUrl {
   const configHmrProtocol =
-    typeof config.server.hmr === "object" ? config.server.hmr.protocol : null;
+    typeof config.server.hmr === 'object' ? config.server.hmr.protocol : null;
   const clientProtocol = configHmrProtocol
-    ? configHmrProtocol === "wss"
-      ? "https"
-      : "http"
+    ? configHmrProtocol === 'wss'
+      ? 'https'
+      : 'http'
     : null;
-  const serverProtocol = config.server.https ? "https" : "http";
+  const serverProtocol = config.server.https ? 'https' : 'http';
   const protocol = clientProtocol ?? serverProtocol;
 
-  const configHmrHost =
-    typeof config.server.hmr === "object" ? config.server.hmr.host : null;
-  const configHost =
-    typeof config.server.host === "string" ? config.server.host : null;
-  const dockerHost =
-    process.env.PHOENIX_DOCKER && !userConfig.server?.host ? "localhost" : null;
-  const serverAddress = isIpv6(address)
-    ? `[${address.address}]`
-    : address.address;
+  const configHmrHost = typeof config.server.hmr === 'object' ? config.server.hmr.host : null;
+  const configHost = typeof config.server.host === 'string' ? config.server.host : null;
+  const dockerHost = process.env.PHOENIX_DOCKER && !userConfig.server?.host ? 'localhost' : null;
+  const serverAddress = isIpv6(address) ? `[${address.address}]` : address.address;
   const host = configHmrHost ?? dockerHost ?? configHost ?? serverAddress;
 
   const configHmrClientPort =
-    typeof config.server.hmr === "object" ? config.server.hmr.clientPort : null;
+    typeof config.server.hmr === 'object' ? config.server.hmr.clientPort : null;
   const port = configHmrClientPort ?? address.port;
 
   return `${protocol}://${host}:${port}`;
@@ -1754,7 +1650,7 @@ function resolveDevServerUrl(
 
 function isIpv6(address: AddressInfo): boolean {
   return (
-    address.family === "IPv6" ||
+    address.family === 'IPv6' ||
     // In node >=18.0 <18.4 this was an integer value. This was changed in a minor version.
     // See: https://github.com/laravel/vite-plugin/issues/103
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1767,7 +1663,7 @@ function isIpv6(address: AddressInfo): boolean {
  * Resolve the Vite base option from the configuration.
  */
 function resolveBase(config: Required<PluginConfig>, assetUrl: string): string {
-  return "/" + assetUrl + "/";
+  return '/' + assetUrl + '/';
 }
 
 /**
@@ -1783,12 +1679,10 @@ function resolveInput(
 
   // Convert string arrays to proper rollup input format
   if (Array.isArray(config.input)) {
-    return config.input.map((entry: string) =>
-      path.resolve(process.cwd(), entry),
-    );
+    return config.input.map((entry: string) => path.resolve(process.cwd(), entry));
   }
 
-  if (typeof config.input === "string") {
+  if (typeof config.input === 'string') {
     return path.resolve(process.cwd(), config.input);
   }
 
@@ -1798,10 +1692,7 @@ function resolveInput(
 /**
  * Resolve the Vite outDir path from the configuration.
  */
-function resolveOutDir(
-  config: Required<PluginConfig>,
-  ssr: boolean,
-): string | undefined {
+function resolveOutDir(config: Required<PluginConfig>, ssr: boolean): string | undefined {
   if (ssr) {
     return config.ssrOutputDirectory;
   }
@@ -1814,19 +1705,17 @@ function resolveOutDir(
  *
  * @see https://vitejs.dev/guide/ssr.html#ssr-externals
  */
-function noExternalInertiaHelpers(
-  config: UserConfig,
-): true | Array<string | RegExp> {
+function noExternalInertiaHelpers(config: UserConfig): true | Array<string | RegExp> {
   /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
   /* @ts-ignore */
   const userNoExternal = (config.ssr as SSROptions | undefined)?.noExternal;
-  const pluginNoExternal = ["phoenix-vite-plugin"];
+  const pluginNoExternal = ['phoenix-vite-plugin'];
 
   if (userNoExternal === true) {
     return true;
   }
 
-  if (typeof userNoExternal === "undefined") {
+  if (typeof userNoExternal === 'undefined') {
     return pluginNoExternal;
   }
 
@@ -1861,9 +1750,7 @@ function resolveDevelopmentEnvironmentServerConfig(
   }
 
   const resolvedHost =
-    detectTls === true || detectTls === null
-      ? phxHost || "localhost"
-      : detectTls;
+    detectTls === true || detectTls === null ? phxHost || 'localhost' : detectTls;
 
   // Check for common certificate locations
   const homeDir = os.homedir();
@@ -1871,61 +1758,53 @@ function resolveDevelopmentEnvironmentServerConfig(
   const possibleCertPaths = [
     // mkcert default location (cross-platform)
     {
-      key: path.join(homeDir, ".local/share/mkcert", `${resolvedHost}-key.pem`),
-      cert: path.join(homeDir, ".local/share/mkcert", `${resolvedHost}.pem`),
-      name: "mkcert",
+      key: path.join(homeDir, '.local/share/mkcert', `${resolvedHost}-key.pem`),
+      cert: path.join(homeDir, '.local/share/mkcert', `${resolvedHost}.pem`),
+      name: 'mkcert',
     },
     // mkcert on macOS
     {
-      key: path.join(
-        homeDir,
-        "Library/Application Support/mkcert",
-        `${resolvedHost}-key.pem`,
-      ),
-      cert: path.join(
-        homeDir,
-        "Library/Application Support/mkcert",
-        `${resolvedHost}.pem`,
-      ),
-      name: "mkcert (macOS)",
+      key: path.join(homeDir, 'Library/Application Support/mkcert', `${resolvedHost}-key.pem`),
+      cert: path.join(homeDir, 'Library/Application Support/mkcert', `${resolvedHost}.pem`),
+      name: 'mkcert (macOS)',
     },
     // Caddy certificates location
     {
       key: path.join(
         homeDir,
-        ".local/share/caddy/certificates/local",
+        '.local/share/caddy/certificates/local',
         `${resolvedHost}`,
         `${resolvedHost}.key`,
       ),
       cert: path.join(
         homeDir,
-        ".local/share/caddy/certificates/local",
+        '.local/share/caddy/certificates/local',
         `${resolvedHost}`,
         `${resolvedHost}.crt`,
       ),
-      name: "Caddy",
+      name: 'Caddy',
     },
     // Generic location in project
     {
-      key: path.join(process.cwd(), "priv/cert", `${resolvedHost}-key.pem`),
-      cert: path.join(process.cwd(), "priv/cert", `${resolvedHost}.pem`),
-      name: "project (priv/cert)",
+      key: path.join(process.cwd(), 'priv/cert', `${resolvedHost}-key.pem`),
+      cert: path.join(process.cwd(), 'priv/cert', `${resolvedHost}.pem`),
+      name: 'project (priv/cert)',
     },
     {
-      key: path.join(process.cwd(), "priv/cert", `${resolvedHost}.key`),
-      cert: path.join(process.cwd(), "priv/cert", `${resolvedHost}.crt`),
-      name: "project (priv/cert)",
+      key: path.join(process.cwd(), 'priv/cert', `${resolvedHost}.key`),
+      cert: path.join(process.cwd(), 'priv/cert', `${resolvedHost}.crt`),
+      name: 'project (priv/cert)',
     },
     // Additional common project locations
     {
-      key: path.join(process.cwd(), "certs", `${resolvedHost}-key.pem`),
-      cert: path.join(process.cwd(), "certs", `${resolvedHost}.pem`),
-      name: "project (certs/)",
+      key: path.join(process.cwd(), 'certs', `${resolvedHost}-key.pem`),
+      cert: path.join(process.cwd(), 'certs', `${resolvedHost}.pem`),
+      name: 'project (certs/)',
     },
     {
-      key: path.join(process.cwd(), "certs", `${resolvedHost}.key`),
-      cert: path.join(process.cwd(), "certs", `${resolvedHost}.crt`),
-      name: "project (certs/)",
+      key: path.join(process.cwd(), 'certs', `${resolvedHost}.key`),
+      cert: path.join(process.cwd(), 'certs', `${resolvedHost}.crt`),
+      name: 'project (certs/)',
     },
   ];
 
@@ -1933,9 +1812,7 @@ function resolveDevelopmentEnvironmentServerConfig(
     searchPaths.push(`${certPath.name}: ${path.dirname(certPath.cert)}`);
     if (fs.existsSync(certPath.key) && fs.existsSync(certPath.cert)) {
       if (process.env.DEBUG || process.env.VERBOSE) {
-        console.log(
-          colors.dim(`Found TLS certificates in ${certPath.name} location`),
-        );
+        console.log(colors.dim(`Found TLS certificates in ${certPath.name} location`));
       }
       return {
         hmr: { host: resolvedHost },
@@ -1953,16 +1830,16 @@ function resolveDevelopmentEnvironmentServerConfig(
     const uniquePaths = [...new Set(searchPaths)];
     console.warn(
       `
-[nb-vite] ${colors.yellow("Warning")}: Unable to find TLS certificate files for host "${resolvedHost}".\n\n` +
+[nb-vite] ${colors.yellow('Warning')}: Unable to find TLS certificate files for host "${resolvedHost}".\n\n` +
         `Searched in the following locations:\n` +
-        uniquePaths.map((p) => `  - ${p}`).join("\n") +
-        "\n\n" +
+        uniquePaths.map((p) => `  - ${p}`).join('\n') +
+        '\n\n' +
         `To generate local certificates, you can use mkcert:\n` +
-        `  ${colors.dim("$")} brew install mkcert  ${colors.dim("# Install mkcert (macOS)")}\n` +
-        `  ${colors.dim("$")} mkcert -install        ${colors.dim("# Install local CA")}\n` +
-        `  ${colors.dim("$")} mkcert ${resolvedHost}  ${colors.dim("# Generate certificate")}\n` +
-        `  ${colors.dim("$")} mkdir -p priv/cert     ${colors.dim("# Create cert directory")}\n` +
-        `  ${colors.dim("$")} mv ${resolvedHost}*.pem priv/cert/  ${colors.dim("# Move certificates")}\n\n` +
+        `  ${colors.dim('$')} brew install mkcert  ${colors.dim('# Install mkcert (macOS)')}\n` +
+        `  ${colors.dim('$')} mkcert -install        ${colors.dim('# Install local CA')}\n` +
+        `  ${colors.dim('$')} mkcert ${resolvedHost}  ${colors.dim('# Generate certificate')}\n` +
+        `  ${colors.dim('$')} mkdir -p priv/cert     ${colors.dim('# Create cert directory')}\n` +
+        `  ${colors.dim('$')} mv ${resolvedHost}*.pem priv/cert/  ${colors.dim('# Move certificates')}\n\n` +
         `Or set detectTls: false in your vite.config.js to disable TLS detection.\n`,
     );
   }
@@ -1994,7 +1871,7 @@ function resolvePhoenixColocatedAliases(): Record<string, string> {
   }
 
   // Build the colocated path
-  const buildPath = process.env.PHX_BUILD_PATH || path.resolve(process.cwd(), '../../_build/dev');
+  const buildPath = process.env.PHX_BUILD_PATH || path.resolve(process.cwd(), '../_build/dev');
   const colocatedPath = path.resolve(buildPath, `phoenix-colocated/${appName}`);
 
   // Add the alias
@@ -2002,9 +1879,7 @@ function resolvePhoenixColocatedAliases(): Record<string, string> {
 
   if (process.env.DEBUG || process.env.VERBOSE) {
     console.log(
-      colors.dim(
-        `Phoenix colocated alias: phoenix-colocated/${appName} -> ${colocatedPath}`
-      )
+      colors.dim(`Phoenix colocated alias: phoenix-colocated/${appName} -> ${colocatedPath}`),
     );
   }
 
@@ -2022,46 +1897,46 @@ function getPhoenixAppName(): string | undefined {
  * Check if Phoenix 1.8 is being used
  */
 function isPhoenix18(): boolean {
-  return process.env.PHX_VERSION === "1.8";
+  return process.env.PHX_VERSION === '1.8';
 }
 
 /**
  * Resolve aliases for Phoenix JavaScript libraries.
- * 
+ *
  * This function automatically detects and creates Vite aliases for Phoenix JS dependencies
  * that are managed by Mix in the deps directory. This allows importing these libraries
  * naturally (e.g., `import { Socket } from "phoenix"`) without needing to know their
  * actual file system location.
- * 
+ *
  * For package managers that don't support workspaces with non-standard structures
  * (npm, pnpm, yarn), this provides a clean way to resolve Phoenix dependencies.
- * 
+ *
  * @returns Record of library names to their resolved file paths
  */
 function resolvePhoenixJSAliases(): Record<string, string> {
   const aliases: Record<string, string> = {};
-  const depsPath = path.resolve(process.cwd(), "../deps");
+  const depsPath = path.resolve(process.cwd(), '../deps');
 
   // Phoenix library configurations
   const phoenixLibraries = [
     {
-      name: "phoenix",
+      name: 'phoenix',
       paths: [
-        "phoenix/priv/static/phoenix.mjs",  // Prefer ESM version
-        "phoenix/priv/static/phoenix.js",    // Fallback to regular JS
+        'phoenix/priv/static/phoenix.mjs', // Prefer ESM version
+        'phoenix/priv/static/phoenix.js', // Fallback to regular JS
       ],
     },
     {
-      name: "phoenix_html",
+      name: 'phoenix_html',
       paths: [
-        "phoenix_html/priv/static/phoenix_html.js",  // No ESM version available
+        'phoenix_html/priv/static/phoenix_html.js', // No ESM version available
       ],
     },
     {
-      name: "phoenix_live_view",
+      name: 'phoenix_live_view',
       paths: [
-        "phoenix_live_view/priv/static/phoenix_live_view.esm.js",  // Prefer ESM version
-        "phoenix_live_view/priv/static/phoenix_live_view.js",      // Fallback to regular JS
+        'phoenix_live_view/priv/static/phoenix_live_view.esm.js', // Prefer ESM version
+        'phoenix_live_view/priv/static/phoenix_live_view.js', // Fallback to regular JS
       ],
     },
   ];
@@ -2072,17 +1947,17 @@ function resolvePhoenixJSAliases(): Record<string, string> {
       const fullPath = path.join(depsPath, libPath);
       if (fs.existsSync(fullPath)) {
         aliases[library.name] = fullPath;
-        
+
         if (process.env.DEBUG || process.env.VERBOSE) {
           const isESM = libPath.includes('.mjs') || libPath.includes('.esm.');
           console.log(
             colors.dim(
-              `Phoenix alias: ${library.name} -> ${libPath} ${isESM ? '(ESM)' : '(CommonJS)'}`
-            )
+              `Phoenix alias: ${library.name} -> ${libPath} ${isESM ? '(ESM)' : '(CommonJS)'}`,
+            ),
           );
         }
-        
-        break;  // Use the first matching path
+
+        break; // Use the first matching path
       }
     }
   }
@@ -2090,15 +1965,15 @@ function resolvePhoenixJSAliases(): Record<string, string> {
   // Warn if expected Phoenix libraries are missing
   if (process.env.DEBUG || process.env.VERBOSE) {
     const missingLibraries = phoenixLibraries
-      .filter(lib => !aliases[lib.name])
-      .map(lib => lib.name);
-    
+      .filter((lib) => !aliases[lib.name])
+      .map((lib) => lib.name);
+
     if (missingLibraries.length > 0) {
       console.log(
         colors.dim(
           `Missing Phoenix JS libraries: ${missingLibraries.join(', ')}. ` +
-          `Make sure to run 'mix deps.get' in your Phoenix project.`
-        )
+            `Make sure to run 'mix deps.get' in your Phoenix project.`,
+        ),
       );
     }
   }

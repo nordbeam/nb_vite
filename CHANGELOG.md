@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Vite+ migration
+
+* Moved the GitHub-distributed library build to Vite+ `vp pack`, preserving the public ESM
+  entry points, declaration files, and `dev-server-index.html` artifact.
+* Added the Vite+ core alias/override and matching Vitest pin, with TypeScript
+  5.9 retained for the plugin's declaration build.
+* Updated generated Phoenix projects to use `vp install`, `vp dev`, `vp build`,
+  `vp preview`, and `vp check`, including lazy plugin loading and Vite+ lint/
+  format defaults.
+* Existing `assets/package.json` and simple Vite configs are migrated without
+  dropping custom dependencies, scripts, or workspace entries. Legacy Bun
+  integration remains available only when explicitly selected.
+
 ## v0.3.0 (2025-09-16)
 
 ### Features

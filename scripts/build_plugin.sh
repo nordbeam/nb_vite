@@ -1,29 +1,29 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "Building Phoenix Vite plugin..."
+echo "Building Phoenix Vite plugin with Vite+..."
 
-# Run npm install at root
-npm install
+if command -v vp >/dev/null 2>&1; then
+  task_vp_bin="vp"
+elif [[ -x "node_modules/.bin/vp" ]]; then
+  task_vp_bin="node_modules/.bin/vp"
+else
+  echo "Vite+ is required to build nb_vite. Run npm install or install it globally with:"
+  echo "  curl -fsSL https://vite.plus | bash"
+  exit 1
+fi
 
-# Build the plugin
-npm run build
+# Vite+ delegates dependency installation to the package manager recorded by
+# the lockfile and uses the local vite-plus package for the pack configuration.
+"$task_vp_bin" install --frozen-lockfile
+"$task_vp_bin" run build
 
-# Copy built files to priv/static/nb_vite
-echo "Copying plugin to priv/static/nb_vite..."
+# Keep the legacy file-reference distribution in sync for applications that
+# have not migrated to the GitHub package yet.
+echo "Copying plugin artifacts to priv/static/nb_vite..."
 mkdir -p priv/static/nb_vite
-cp priv/nb_vite/dist/index.js priv/static/nb_vite/index.js
-cp priv/nb_vite/src/dev-server-index.html priv/static/nb_vite/dev-server-index.html
-cp priv/static/nb_vite/package.json priv/static/nb_vite/package.json.bak
-cat > priv/static/nb_vite/package.json << 'EOF'
-{
-  "name": "nb_vite",
-  "version": "0.1.0",
-  "description": "Vite plugin for Phoenix Framework",
-  "type": "module",
-  "main": "./index.js",
-  "types": "./index.d.ts"
-}
-EOF
+for artifact in priv/nb_vite/dist/*; do
+  cp "$artifact" priv/static/nb_vite/
+done
 
 echo "Plugin built successfully!"

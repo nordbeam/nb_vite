@@ -4,9 +4,9 @@ if Code.ensure_loaded?(Igniter) do
     Installs and configures Phoenix Vite in a Phoenix application using Igniter.
 
     This installer:
-    1. Creates vite.config.js with appropriate configuration
-    2. Updates package.json with Vite dependencies and scripts
-    3. Adds the Vite watcher to the development configuration
+    1. Creates a Vite+ config with appropriate Phoenix integration
+    2. Updates package.json with Vite+ dependencies and scripts
+    3. Adds the Vite+ watcher to the development configuration
     4. Updates the root layout template to use Vite helpers
     5. Creates or updates asset files for Vite
 
@@ -32,7 +32,7 @@ if Code.ensure_loaded?(Igniter) do
 
     use Igniter.Mix.Task
 
-    alias Mix.Tasks.NbVite.Install.BunIntegration
+    alias Mix.Tasks.NbVite.Install.VitePlusIntegration
 
     @impl Igniter.Mix.Task
     def info(_argv, _parent) do
@@ -57,7 +57,7 @@ if Code.ensure_loaded?(Igniter) do
 
       igniter
       |> Igniter.Project.Formatter.import_dep(:nb_vite)
-      |> BunIntegration.integrate()
+      |> VitePlusIntegration.integrate()
       |> configure_otp_app()
       |> configure_test_env()
       |> setup_html_helpers()
@@ -69,21 +69,25 @@ if Code.ensure_loaded?(Igniter) do
       |> print_next_steps()
     end
 
-    # Test helpers - delegate to BunIntegration since Bun is now always used
+    # Compatibility helpers retained for callers of older installer APIs. The
+    # old names are intentionally narrow so invoking one does not queue a
+    # dependency install or rewrite unrelated project configuration.
     def update_mix_aliases(igniter) do
-      BunIntegration.integrate(igniter)
+      VitePlusIntegration.update_mix_aliases(igniter)
     end
 
     def setup_watcher(igniter) do
-      BunIntegration.integrate(igniter)
+      VitePlusIntegration.setup_watcher(igniter)
     end
 
+    @deprecated "Bun support is legacy; Vite+ setup is performed by integrate/1."
     def maybe_add_bun_dep(igniter) do
-      BunIntegration.integrate(igniter)
+      igniter
     end
 
+    @deprecated "Bun support is legacy; Vite+ setup is performed by integrate/1."
     def maybe_setup_bun_config(igniter) do
-      BunIntegration.integrate(igniter)
+      igniter
     end
 
     def configure_otp_app(igniter) do
@@ -183,13 +187,139 @@ if Code.ensure_loaded?(Igniter) do
       is_phoenix_1_8 = igniter.assigns[:is_phoenix_1_8] || false
       app_name = Igniter.Project.Application.app_name(igniter) |> to_string()
 
-      # No longer need to copy the phoenix plugin - it's available via npm workspace
+      # The plugin is installed from npm; no vendored JavaScript is needed.
 
       # Only pass typescript option for standard vite config - react and ssr are handled by nb_inertia
       simplified_options = %{typescript: igniter.args.options[:typescript]}
       config = build_vite_config(simplified_options, has_tailwind, is_phoenix_1_8, app_name)
+      config_path = existing_vite_config_path(igniter)
 
-      Igniter.create_new_file(igniter, "assets/vite.config.js", config, on_exists: :skip)
+      case config_path do
+        nil ->
+          Igniter.create_new_file(igniter, "assets/vite.config.js", config, on_exists: :skip)
+
+        path ->
+          migrate_existing_vite_config(igniter, path, simplified_options)
+      end
+    end
+
+    defp existing_vite_config_path(igniter) do
+      Enum.find(["assets/vite.config.ts", "assets/vite.config.js"], &Igniter.exists?(igniter, &1))
+    end
+
+    defp migrate_existing_vite_config(igniter, path, options) do
+      Igniter.update_file(igniter, path, fn source ->
+        content = Rewrite.Source.get(source, :content)
+        migrated = migrate_vite_config_content(content, options)
+
+        if migrated == content do
+          {:notice,
+           "#{path} was left unchanged because its structure was not recognized. Run `vp migrate --no-interactive` or apply the Vite+ import and metadata changes manually."}
+        else
+          Rewrite.Source.update(source, :content, migrated)
+        end
+      end)
+    end
+
+    @doc "Conservatively migrates a JavaScript/TypeScript Vite config to Vite+."
+    def migrate_vite_config_content(content, options \\ %{}) when is_binary(content) do
+      migrated = replace_vite_plus_define_config_import(content)
+      migrated = maybe_wrap_plugins_with_lazy(migrated)
+
+      migrated =
+        if Regex.match?(~r/plugins:\s*lazyPlugins\s*\(/, migrated) do
+          maybe_add_lazy_plugins_import(migrated)
+        else
+          migrated
+        end
+
+      maybe_add_vite_plus_quality_config(migrated, options)
+    end
+
+    defp replace_vite_plus_define_config_import(content) do
+      regex = ~r/(import\s*\{[^}]*\bdefineConfig\b[^}]*\}\s*from\s*)['"]vite['"]/
+
+      Regex.replace(
+        regex,
+        content,
+        fn _full, prefix ->
+          prefix <> "'vite-plus'"
+        end,
+        global: false
+      )
+    end
+
+    defp maybe_wrap_plugins_with_lazy(content) do
+      regex = ~r/plugins:(\s*)\[(?<body>[^\[\]]*)\]/s
+      matches = Regex.scan(regex, content)
+
+      if length(matches) == 1 and not String.contains?(content, "lazyPlugins") do
+        Regex.replace(
+          regex,
+          content,
+          fn _full, whitespace, body ->
+            "plugins:" <> whitespace <> "lazyPlugins(() => [" <> body <> "])"
+          end,
+          global: false
+        )
+      else
+        content
+      end
+    end
+
+    defp maybe_add_lazy_plugins_import(content) do
+      has_lazy_plugins_import =
+        Regex.match?(
+          ~r/import\s*\{[^}]*\blazyPlugins\b[^}]*\}\s*from\s*['"]vite-plus['"]/,
+          content
+        )
+
+      if has_lazy_plugins_import do
+        content
+      else
+        regex =
+          ~r/(import\s*\{)([^}]*\bdefineConfig\b[^}]*)(\}\s*from\s*['"]vite-plus['"])/
+
+        Regex.replace(
+          regex,
+          content,
+          fn _full, opening, imports, closing ->
+            opening <> String.trim_trailing(imports) <> ", lazyPlugins " <> closing
+          end,
+          global: false
+        )
+      end
+    end
+
+    defp maybe_add_vite_plus_quality_config(content, _options) do
+      has_fmt = Regex.match?(~r/^\s*fmt\s*:/m, content)
+
+      quality_config =
+        [
+          if(not has_fmt,
+            do:
+              "fmt: {\n    ignorePatterns: ['dist/**'],\n    singleQuote: true,\n    semi: true,\n    sortPackageJson: true,\n  },\n",
+            else: ""
+          )
+        ]
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.join()
+
+      if quality_config == "" do
+        content
+      else
+        case Regex.run(~r/defineConfig\(\s*\{/, content, return: :index) do
+          [{index, match_length}] ->
+            insert_at = index + match_length
+
+            binary_part(content, 0, insert_at) <>
+              "\n  " <>
+              quality_config <> binary_part(content, insert_at, byte_size(content) - insert_at)
+
+          _ ->
+            content
+        end
+      end
     end
 
     defp build_vite_config(options, has_tailwind, is_phoenix_1_8, app_name) do
@@ -205,16 +335,17 @@ if Code.ensure_loaded?(Igniter) do
       plugins = build_vite_plugins(options, has_tailwind)
       input_files = build_input_files(options)
       additional_opts = build_additional_options(options)
+      quality_config = build_quality_config(options)
 
-      path_import =
-        if is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
+      path_import = "\nimport path from 'path'"
 
       """
-      import { defineConfig } from 'vite'
+      import { defineConfig, lazyPlugins } from 'vite-plus'
       import phoenix from '@nordbeam/nb-vite'#{path_import}#{imports}
 
       export default defineConfig({
-        plugins: [#{plugins}
+        #{quality_config}
+        plugins: lazyPlugins(() => [#{plugins}
           phoenix({
             input: #{input_files},
             publicDirectory: '../priv/static',
@@ -222,7 +353,7 @@ if Code.ensure_loaded?(Igniter) do
             hotFile: '../priv/hot',
             manifestPath: '../priv/static/assets/manifest.json',#{additional_opts}
           })
-        ],
+        ]),
         server: {
           host: process.env.VITE_HOST || "127.0.0.1", // Force IPv4 for Elixir compatibility
           port: parseInt(process.env.VITE_PORT || "5173"),
@@ -237,22 +368,23 @@ if Code.ensure_loaded?(Igniter) do
       input_files = build_input_files(options)
       additional_opts = build_additional_options(options)
       extension = if options[:typescript], do: "tsx", else: "jsx"
+      quality_config = build_quality_config(options)
 
-      path_import =
-        if is_phoenix_1_8 || true, do: "\nimport path from 'path'", else: ""
+      path_import = "\nimport path from 'path'"
 
       """
-      import { defineConfig } from 'vite'
+      import { defineConfig, lazyPlugins } from 'vite-plus'
       import phoenix from '@nordbeam/nb-vite'#{path_import}#{imports}
       import nodePrefixPlugin from './vite-plugins/node-prefix-plugin.js'
 
-      export default defineConfig(({ command, mode, isSsrBuild }) => {
+      export default defineConfig(({ isSsrBuild }) => {
         const isSSR = isSsrBuild || process.env.BUILD_SSR === "true";
 
         if (isSSR) {
           // SSR build configuration for Deno compatibility
           return {
-            plugins: [#{build_ssr_plugins(options)}nodePrefixPlugin()],
+            #{quality_config}
+            plugins: lazyPlugins(() => [#{build_ssr_plugins(options)}nodePrefixPlugin()]),
             build: {
               ssr: true,
               outDir: "../priv/static",
@@ -280,7 +412,8 @@ if Code.ensure_loaded?(Igniter) do
 
         // Client build configuration
         return {
-          plugins: [#{plugins}
+          #{quality_config}
+          plugins: lazyPlugins(() => [#{plugins}
             phoenix({
               input: #{input_files},
               publicDirectory: '../priv/static',
@@ -288,9 +421,20 @@ if Code.ensure_loaded?(Igniter) do
               hotFile: '../priv/hot',
               manifestPath: '../priv/static/assets/manifest.json',#{additional_opts}
             })
-          ],#{build_ssr_server_config()}#{build_resolve_config(options, is_phoenix_1_8, app_name)}
+          ]),#{build_ssr_server_config()}#{build_resolve_config(options, is_phoenix_1_8, app_name)}
         };
       })
+      """
+    end
+
+    defp build_quality_config(_options) do
+      """
+      fmt: {
+        ignorePatterns: ['dist/**'],
+        singleQuote: true,
+        semi: true,
+        sortPackageJson: true,
+      },
       """
     end
 
@@ -391,20 +535,28 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
-    defp build_resolve_config(options, _is_phoenix_1_8, _app_name) do
-      # The phoenix-colocated alias is now handled by the Vite plugin itself
-      if options[:typescript] do
-        """
+    defp build_resolve_config(options, is_phoenix_1_8, app_name) do
+      aliases =
+        []
+        |> maybe_add_config("'@': path.resolve(__dirname, './js')", !!options[:typescript])
+        |> maybe_add_config(
+          "'phoenix-colocated/#{app_name}': path.resolve(__dirname, `../_build/${process.env.MIX_ENV || 'dev'}/phoenix-colocated/#{app_name}`)",
+          is_phoenix_1_8
+        )
 
-          resolve: {
-            alias: {
-              '@': path.resolve(__dirname, './js')
+      case aliases do
+        [] ->
+          ""
+
+        entries ->
+          """
+
+            resolve: {
+              alias: {
+                #{Enum.join(entries, ",\n        ")}
+              }
             }
-          }
-        """
-      else
-        # No resolve configuration needed by default
-        ""
+          """
       end
     end
 
@@ -416,7 +568,7 @@ if Code.ensure_loaded?(Igniter) do
       |> detect_project_features()
       |> build_and_write_package_json()
       |> update_vendor_imports()
-      |> queue_npm_install()
+      |> queue_vite_plus_install()
     end
 
     defp detect_project_features(igniter) do
@@ -438,48 +590,167 @@ if Code.ensure_loaded?(Igniter) do
 
     defp build_and_write_package_json(igniter) do
       features = igniter.assigns[:detected_features]
+      app_name = Igniter.Project.Application.app_name(igniter) |> to_string()
 
-      dependencies = build_dependencies(features)
-      dev_dependencies = build_dev_dependencies(features)
+      generated =
+        package_json(features, app_name)
+        |> put_in(
+          ["devDependencies", "@nordbeam/nb-vite"],
+          nb_vite_client_package_source(igniter)
+        )
 
-      package_json = %{
-        "name" => Igniter.Project.Application.app_name(igniter) |> to_string(),
+      path = "assets/package.json"
+
+      if Igniter.exists?(igniter, path) do
+        Igniter.update_file(igniter, path, fn source ->
+          content = Rewrite.Source.get(source, :content)
+
+          case Jason.decode(content) do
+            {:ok, existing} when is_map(existing) ->
+              migrated = merge_package_json(existing, generated)
+              Rewrite.Source.update(source, :content, Jason.encode!(migrated, pretty: true))
+
+            _ ->
+              {:warning,
+               "Could not migrate #{path}: it is not valid JSON. Vite+ dependencies and scripts were not changed."}
+          end
+        end)
+      else
+        Igniter.create_new_file(igniter, path, Jason.encode!(generated, pretty: true),
+          on_exists: :skip
+        )
+      end
+    end
+
+    @doc "Builds the package manifest emitted by the Vite+ installer."
+    def package_json(features, app_name) when is_map(features) and is_binary(app_name) do
+      vite_plus_versions = VitePlusIntegration.versions()
+
+      %{
+        "name" => app_name,
         "version" => "0.0.0",
         "type" => "module",
         "private" => true,
-        # Only include Phoenix packages in workspaces, not all deps
-        # This prevents conflicts with nb packages that have their own package.json
-        "workspaces" => ["../deps/phoenix", "../deps/phoenix_html", "../deps/phoenix_live_view"],
-        "dependencies" => dependencies,
-        "devDependencies" => dev_dependencies,
+        "packageManager" => "npm@12.0.2",
+        "devEngines" => %{
+          "packageManager" => %{
+            "name" => "npm",
+            "version" => "12.0.2",
+            "onFail" => "download"
+          }
+        },
+        "dependencies" => build_dependencies(features),
+        "devDependencies" => build_dev_dependencies(features),
+        "overrides" => %{
+          "vite" => vite_plus_versions.vite_core,
+          "vitest" => vite_plus_versions.vitest
+        },
+        "engines" => %{"node" => ">=20.19.0"},
         "scripts" => %{
-          "dev" => "vite",
-          "build" => "vite build"
+          "dev" => "vp dev",
+          "build" => "vp build",
+          "preview" => "vp preview",
+          "check" =>
+            if(features.typescript,
+              do: "vp check && tsc --noEmit",
+              else: "vp check"
+            ),
+          "test" => "vp test --passWithNoTests"
         }
       }
-
-      # Add Bun workspaces for Phoenix JS libraries if needed
-      package_json = BunIntegration.update_package_json(package_json, igniter)
-
-      content = Jason.encode!(package_json, pretty: true)
-
-      Igniter.create_new_file(igniter, "assets/package.json", content, on_exists: :skip)
     end
+
+    @doc "Merges Vite+ requirements into an existing assets package manifest."
+    def merge_package_json(existing, generated) when is_map(existing) and is_map(generated) do
+      existing
+      |> Map.put_new("name", generated["name"])
+      |> Map.put_new("version", generated["version"])
+      |> Map.put("type", generated["type"])
+      |> Map.put_new("private", generated["private"])
+      |> Map.put_new("packageManager", generated["packageManager"])
+      |> Map.put_new("devEngines", generated["devEngines"])
+      |> merge_json_object("dependencies", generated)
+      |> merge_json_object("devDependencies", generated)
+      |> merge_json_object("overrides", generated)
+      |> merge_json_object("engines", generated)
+      |> merge_json_object("scripts", generated)
+    end
+
+    @doc false
+    def nb_vite_client_package_source(igniter) do
+      case Igniter.Project.Deps.get_dep(igniter, :nb_vite) do
+        {:ok, dep_declaration} when is_binary(dep_declaration) ->
+          npm_source_from_dep_declaration(dep_declaration, "github:nordbeam/nb_vite")
+
+        _ ->
+          "github:nordbeam/nb_vite"
+      end
+    end
+
+    @doc false
+    def npm_source_from_dep_declaration(dep_declaration, default_source) do
+      dep_declaration
+      |> Code.eval_string()
+      |> elem(0)
+      |> nb_vite_dep_source(default_source)
+    rescue
+      _ -> default_source
+    end
+
+    defp nb_vite_dep_source({_, opts}, default_source) when is_list(opts),
+      do: nb_vite_dep_opts_source(opts, default_source)
+
+    defp nb_vite_dep_source({_, _version, opts}, default_source) when is_list(opts),
+      do: nb_vite_dep_opts_source(opts, default_source)
+
+    defp nb_vite_dep_source(_, default_source), do: default_source
+
+    defp nb_vite_dep_opts_source(opts, default_source) do
+      cond do
+        is_binary(opts[:path]) ->
+          "file:#{opts[:path] |> Path.expand() |> Path.join("priv/nb_vite")}"
+
+        is_binary(opts[:github]) ->
+          "github:#{opts[:github]}#{git_ref_suffix(opts)}"
+
+        is_binary(opts[:git]) ->
+          "#{opts[:git]}#{git_ref_suffix(opts)}"
+
+        true ->
+          default_source
+      end
+    end
+
+    defp git_ref_suffix(opts) do
+      case opts[:ref] || opts[:tag] || opts[:branch] do
+        ref when is_binary(ref) and ref != "" -> "##{ref}"
+        _ -> ""
+      end
+    end
+
+    defp merge_json_object(package_json, key, generated) do
+      current = package_json |> Map.get(key, %{}) |> ensure_json_object()
+      required = generated |> Map.get(key, %{}) |> ensure_json_object()
+      Map.put(package_json, key, Map.merge(current, required))
+    end
+
+    defp ensure_json_object(value) when is_map(value), do: value
+    defp ensure_json_object(_value), do: %{}
 
     defp build_dependencies(features) do
       deps = %{
-        "phoenix" => "workspace:*",
-        "phoenix_html" => "workspace:*",
-        "phoenix_live_view" => "workspace:*"
+        "phoenix" => "^1.8.13",
+        "phoenix_html" => "^4.3.0",
+        "phoenix_live_view" => "^1.2.11"
       }
 
-      deps = if features.topbar, do: Map.put(deps, "topbar", "^3.0.0"), else: deps
+      deps = if features.topbar, do: Map.put(deps, "topbar", "^3.0.1"), else: deps
 
       deps =
         if features.tailwind do
           Map.merge(deps, %{
-            "@tailwindcss/vite" => "^4.1.0",
-            "tailwindcss" => "^4.1.0"
+            "@tailwindcss/vite" => "^4.3.3",
+            "tailwindcss" => "^4.3.3"
           })
         else
           deps
@@ -489,9 +760,9 @@ if Code.ensure_loaded?(Igniter) do
 
       if features.react do
         Map.merge(deps, %{
-          "react" => "^19.1.0",
-          "react-dom" => "^19.1.0",
-          "@vitejs/plugin-react" => "^6.0.1"
+          "react" => "^19.2.8",
+          "react-dom" => "^19.2.8",
+          "@vitejs/plugin-react" => "^6.1.1"
         })
       else
         deps
@@ -499,30 +770,28 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp build_dev_dependencies(features) do
+      vite_plus_versions = VitePlusIntegration.versions()
+
       dev_deps = %{
-        "vite" => "^8.0.8",
+        "vite" => vite_plus_versions.vite_core,
+        "vite-plus" => vite_plus_versions.vite_plus,
         "@nordbeam/nb-vite" => "github:nordbeam/nb_vite",
-        "@types/phoenix" => "^1.6.0"
+        "@types/phoenix" => "^1.6.7"
       }
 
       dev_deps =
         if features.typescript do
-          Map.put(dev_deps, "typescript", "^5.7.2")
-        else
-          dev_deps
-        end
-
-      dev_deps =
-        if features.ssr do
-          Map.put(dev_deps, "vite-node", "^3.0.0")
+          # Vite+ currently bundles a newer TypeScript toolchain, but the
+          # plugin's declaration build remains compatible with TypeScript 5.9.
+          Map.put(dev_deps, "typescript", "^5.9.3")
         else
           dev_deps
         end
 
       if features.react && features.typescript do
         Map.merge(dev_deps, %{
-          "@types/react" => "^19.1.0",
-          "@types/react-dom" => "^19.1.0"
+          "@types/react" => "^19.2.18",
+          "@types/react-dom" => "^19.2.5"
         })
       else
         dev_deps
@@ -553,14 +822,14 @@ if Code.ensure_loaded?(Igniter) do
 
     defp maybe_update_daisyui_imports(igniter, false), do: igniter
 
-    defp queue_npm_install(igniter) do
-      case BunIntegration.install_command(igniter) do
-        nil ->
-          # Bun handles its own installation
-          igniter
-
-        install_cmd ->
-          Igniter.add_task(igniter, "cmd", [install_cmd])
+    defp queue_vite_plus_install(igniter) do
+      if System.find_executable("vp") do
+        Igniter.add_task(igniter, "cmd", [VitePlusIntegration.install_command()])
+      else
+        Igniter.add_notice(
+          igniter,
+          "Vite+ was not found on PATH, so asset installation was skipped. Run `vp -C assets install` after installing Vite+."
+        )
       end
     end
 
@@ -735,6 +1004,7 @@ if Code.ensure_loaded?(Igniter) do
       igniter
       |> create_app_js(typescript)
       |> create_app_css()
+      |> move_colocated_css_import_to_javascript(typescript)
       |> maybe_create_typescript_config(typescript)
     end
 
@@ -765,6 +1035,45 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
+    defp move_colocated_css_import_to_javascript(igniter, typescript) do
+      app_name = igniter |> Igniter.Project.Application.app_name() |> to_string()
+      css_import = "phoenix-colocated/#{app_name}/colocated.css"
+      entry_path = if typescript, do: "assets/js/app.ts", else: "assets/js/app.js"
+
+      igniter =
+        if Igniter.exists?(igniter, "assets/css/app.css") do
+          igniter
+          |> Igniter.include_existing_file("assets/css/app.css")
+          |> Igniter.update_file("assets/css/app.css", fn source ->
+            Rewrite.Source.update(source, :content, fn content ->
+              String.replace(
+                content,
+                ~r/^\s*@import\s+["']#{Regex.escape(css_import)}["'];?\s*\n/m,
+                ""
+              )
+            end)
+          end)
+        else
+          igniter
+        end
+
+      if Igniter.exists?(igniter, entry_path) do
+        igniter
+        |> Igniter.include_existing_file(entry_path)
+        |> Igniter.update_file(entry_path, fn source ->
+          Rewrite.Source.update(source, :content, fn content ->
+            if String.contains?(content, css_import) do
+              content
+            else
+              ~s(import "#{css_import}";) <> "\n" <> content
+            end
+          end)
+        end)
+      else
+        igniter
+      end
+    end
+
     defp maybe_create_typescript_config(igniter, false), do: igniter
 
     defp maybe_create_typescript_config(igniter, true) do
@@ -779,7 +1088,6 @@ if Code.ensure_loaded?(Igniter) do
       """
       {
         "compilerOptions": {
-          "baseUrl": ".",
           "paths": {
             "@/*": ["./js/*"]
           },
@@ -907,6 +1215,14 @@ if Code.ensure_loaded?(Igniter) do
             content when is_binary(content) ->
               # Replace vendored daisyUI imports with npm version
               content
+              |> String.replace(
+                ~r/@plugin\s+["']daisyui\/packages\/bundle\/daisyui-theme["']/,
+                ~s(@plugin "daisyui/theme")
+              )
+              |> String.replace(
+                ~r/@plugin\s+["']daisyui\/packages\/bundle\/daisyui["']/,
+                ~s(@plugin "daisyui")
+              )
               |> String.replace(~r/@plugin\s+"\.\.\/vendor\/daisyui"/, "@plugin \"daisyui\"")
               |> String.replace(
                 ~r/@plugin\s+"\.\.\/vendor\/daisyui-theme"/,
@@ -952,15 +1268,14 @@ if Code.ensure_loaded?(Igniter) do
 
     defp build_installation_notices(options) do
       base_notice = """
-      Phoenix Vite has been installed! Here are the next steps:
+      Phoenix Vite+ has been installed! Here are the next steps:
 
-      1. Vite is now configured as your asset watcher
+      1. Vite+ is now configured as your asset watcher
       2. Your root layout has been updated to use Vite helpers
       3. Run `mix phx.server` to start development with hot module reloading
       """
 
       notices = [base_notice]
-      # Bun notice is now handled by BunIntegration
       notices = maybe_add_typescript_notice(notices, options)
       notices = maybe_add_inertia_notice(notices, options)
 

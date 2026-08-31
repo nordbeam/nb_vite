@@ -1,0 +1,4 @@
+interface:
+  display_name: "nb Vite"
+  short_description: "Build Phoenix assets with Vite+ and HMR"
+  default_prompt: "Use $nb-vite to install or diagnose a version-aware Phoenix Vite+ build setup."

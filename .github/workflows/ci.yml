@@ -12,20 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        elixir: ['1.13', '1.14', '1.15', '1.16', '1.17', '1.18']
-        otp: ['24', '25', '26', '27']
-        exclude:
-          - elixir: '1.13'
-            otp: '27'
-          - elixir: '1.14'
-            otp: '27'
+        include:
           - elixir: '1.15'
-            otp: '27'
-          - elixir: '1.13'
-            otp: '26'
+            otp: '25'
+          - elixir: '1.20'
+            otp: '29'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Set up Elixir
       uses: erlef/setup-beam@v1
@@ -33,8 +27,15 @@ jobs:
         elixir-version: ${{ matrix.elixir }}
         otp-version: ${{ matrix.otp }}
 
+    - name: Set up Vite+
+      uses: voidzero-dev/setup-vp@v1.18.0
+      with:
+        node-version: '26'
+        cache: true
+        run-install: true
+
     - name: Restore dependencies cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           deps
@@ -49,9 +50,12 @@ jobs:
     - name: Compile
       run: mix compile --warnings-as-errors
 
+    - name: Build JavaScript plugin
+      run: vp run build
+
     - name: Run tests
       run: mix test
 
     - name: Check formatting
       run: mix format --check-formatted
-      if: matrix.elixir == '1.18' && matrix.otp == '27'
+      if: matrix.elixir == '1.20' && matrix.otp == '29'

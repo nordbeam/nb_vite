@@ -2,9 +2,9 @@
 
 ## What is NbVite?
 
-NbVite is a Phoenix integration library for Vite that enables modern frontend development with Hot Module Replacement (HMR), framework support (React, Vue, Svelte), and optimized production builds. It provides seamless integration between Elixir/Phoenix and Vite's build tooling.
+NbVite is a Phoenix integration library for Vite+ that enables modern frontend development with Hot Module Replacement (HMR), framework support (React, Vue, Svelte), and optimized production builds. It provides seamless integration between Elixir/Phoenix and Vite+'s unified tooling.
 
-**Note**: This is a PURE Vite integration. For Inertia.js support, use the separate `nb_inertia` package.
+**Note**: This is a pure Phoenix/Vite+ integration. For Inertia.js support, use the separate `nb_inertia` package. Bun is retained only as a legacy opt-in path.
 
 ## Installation
 
@@ -22,10 +22,16 @@ end
 
 ```bash
 mix deps.get
-mix igniter.install nb_vite --react --typescript
+mix igniter.install nb_vite --typescript
 ```
 
-The installer automatically configures your Phoenix project.
+The installer configures the Vite+ watcher, `vite-plus@0.3.0`, the Vite core
+alias/override, and Vite+ package scripts. Install the global CLI if needed:
+
+```bash
+curl -fsSL https://vite.plus | bash
+vp -C assets install
+```
 
 ## Core Template Helpers
 
@@ -82,7 +88,7 @@ end
 
 NbVite automatically detects the environment:
 
-- **Development**: Assets loaded from Vite dev server (http://localhost:5173) with HMR
+- **Development**: Assets loaded from the Vite+ dev server (http://localhost:5173) with HMR
 - **Production**: Assets loaded from manifest.json with hashed filenames
 
 Detection uses `priv/hot` file (created by Vite dev server).
@@ -90,16 +96,16 @@ Detection uses `priv/hot` file (created by Vite dev server).
 ## Mix Tasks
 
 ```bash
-# Run Vite dev server
+# Run the Vite+ dev server
 mix nb_vite dev
 
-# Install JavaScript dependencies
+# Install JavaScript dependencies through Vite+
 mix nb_vite.deps
 
 # Build assets for production
 mix nb_vite.build
 
-# Any Vite command
+# Any Vite+ command
 mix nb_vite <command> <args>
 ```
 
@@ -126,11 +132,11 @@ end
 
 ## Development Workflow
 
-1. **Start Phoenix with Vite dev server**:
+1. **Start Phoenix with Vite+ dev server**:
    ```bash
    mix phx.server
    ```
-   The Vite dev server runs automatically via Phoenix watchers.
+   The `vp dev` server runs automatically via Phoenix watchers.
 
 2. **Edit assets**: Changes auto-reload via HMR
 3. **Add new assets**: Include them in `vite.config.js` input array
@@ -141,6 +147,9 @@ end
 mix nb_vite.build    # Builds assets
 mix phx.digest       # Digests static files
 ```
+
+The underlying frontend command is `vp build` from `assets/`; the Mix wrapper
+keeps Phoenix's existing release workflow intact.
 
 Or use the typical assets.deploy alias:
 
@@ -161,10 +170,11 @@ Then: `mix assets.deploy`
 
 ```javascript
 // assets/vite.config.js
-import phoenix from 'nb_vite'
+import { defineConfig, lazyPlugins } from 'vite-plus'
+import phoenix from '@nordbeam/nb-vite'
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: [
         'js/app.js',
@@ -173,7 +183,7 @@ export default defineConfig({
       ],
       // ... other phoenix config
     })
-  ]
+  ])
 })
 ```
 
@@ -201,8 +211,16 @@ Place images/fonts in `assets/images/` or `assets/fonts/`, then reference:
 
 **"Asset not found in Vite manifest"**: Run `mix nb_vite.build` or check that the asset path matches vite.config.js
 
-**"Vite dev server is not running"**: Start Phoenix with `mix phx.server` or manually run `mix nb_vite dev`
+**"Vite+ dev server is not running"**: Start Phoenix with `mix phx.server` or manually run `mix nb_vite dev` (or `vp -C assets dev`)
 
 **HMR not working**: Check that `priv/hot` file exists and contains correct dev server URL
 
 **Assets not loading in production**: Ensure `mix nb_vite.build` was run and manifest.json exists
+
+## Vite+ compatibility
+
+Generated projects use Vite+ `0.3.0`, Node.js `>=20.19.0`, the Vite core alias
+`npm:@voidzero-dev/vite-plus-core@0.3.0`, and a matching `vitest` override.
+The GitHub-distributed plugin build intentionally uses TypeScript 5.9.
+Generated apps use `vp check` for formatting/linting and the `check` package
+script for the separate TypeScript 5.9 compiler pass.

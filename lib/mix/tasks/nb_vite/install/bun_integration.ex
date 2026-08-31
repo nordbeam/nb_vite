@@ -50,10 +50,10 @@ defmodule Mix.Tasks.NbVite.Install.BunIntegration do
 
   @doc """
   Checks if the project is using Bun integration.
-  Always returns true since Bun is now the default.
+  This legacy integration is opt-in. New installations use Vite+.
   """
-  def using_bun?(_igniter) do
-    true
+  def using_bun?(igniter) do
+    Map.get(igniter.assigns, :use_bun, false)
   end
 
   @doc """

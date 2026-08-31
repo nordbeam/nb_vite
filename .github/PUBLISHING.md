@@ -1,15 +1,16 @@
 # Publishing to Hex.pm
 
-This document describes how Vitex is automatically published to Hex.pm.
+This document describes how nb_vite is published to Hex.pm. The JavaScript
+package is consumed directly from GitHub and is never published to npm.
 
 ## Automated Publishing Process
 
-Vitex uses GitHub Actions to automatically publish new versions to Hex.pm whenever changes are pushed to the main branch.
+nb_vite uses GitHub Actions to publish tagged versions to Hex.pm.
 
 ### Prerequisites
 
 1. **Hex.pm Account**: You need an account on [Hex.pm](https://hex.pm)
-2. **Package Ownership**: You must be an owner of the `vitex` package
+2. **Package Ownership**: You must be an owner of the `nb_vite` package
 3. **API Key**: Generate a Hex.pm API key for publishing
 
 ### Setting up the Hex API Key
@@ -18,7 +19,7 @@ Vitex uses GitHub Actions to automatically publish new versions to Hex.pm whenev
 2. Go to your [dashboard](https://hex.pm/dashboard)
 3. Click on "API keys" in the sidebar
 4. Click "Generate new key"
-5. Give it a name like "GitHub Actions - Vitex"
+5. Give it a name like "GitHub Actions - nb_vite"
 6. Select the following permissions:
    - `api:read` (to check existing versions)
    - `api:write` (to publish packages)
@@ -38,7 +39,7 @@ Vitex uses GitHub Actions to automatically publish new versions to Hex.pm whenev
 The publishing process is handled by `.github/workflows/publish.yml`:
 
 1. **Trigger**: Git tags matching `v*.*.*` pattern (e.g., `v0.1.0`, `v1.2.3`)
-2. **Build Plugin**: Compiles the JavaScript plugin in `priv/vitex`
+2. **Build Plugin**: Compiles the JavaScript plugin in `priv/nb_vite` with Vite+
 3. **Run Tests**: Ensures all tests pass
 4. **Verify Version**: Ensures tag version matches mix.exs version
 5. **Publish**: Publishes to Hex.pm
@@ -48,7 +49,7 @@ The publishing process is handled by `.github/workflows/publish.yml`:
 
 ### Release Process
 
-Vitex uses semantic versioning and tag-based releases. Here's the recommended workflow:
+nb_vite uses semantic versioning and tag-based releases. Here's the recommended workflow:
 
 #### Option 1: Using the Prepare Release Workflow (Recommended)
 
@@ -81,7 +82,7 @@ Vitex uses semantic versioning and tag-based releases. Here's the recommended wo
 
 2. Update README examples:
    ```elixir
-   {:vitex, "~> 0.1.1"}
+   {:nb_vite, "~> 0.1.1"}
    ```
 
 3. Update CHANGELOG.md:
@@ -116,6 +117,8 @@ The tag push will automatically trigger the publishing workflow.
 3. **Test Matrix**: PRs are tested against multiple Elixir/OTP versions
 4. **Formatting**: Code must be properly formatted (`mix format`)
 5. **No Auto-increment**: Versions are NOT automatically incremented - releases are intentional
+6. **No npm Publish**: `@nordbeam/nb-vite` is installed from
+   `github:nordbeam/nb_vite`; do not run `npm publish`
 
 ## Troubleshooting
 
@@ -126,14 +129,14 @@ If the publish workflow fails:
 1. Check the GitHub Actions logs
 2. Ensure the JavaScript plugin builds correctly:
    ```bash
-   cd priv/vitex
-   npm ci
-   npm run build
+   vp install
+   vp run check
+   vp run build
    ```
 
 3. Verify the built file exists:
    ```bash
-   ls -la priv/static/vitex/index.js
+   ls -la priv/nb_vite/dist/index.js
    ```
 
 ### Tag/Version Mismatch
@@ -156,10 +159,9 @@ For emergency releases, you can publish locally:
 
 ```bash
 # Build the plugin first
-cd priv/vitex
-npm ci
-npm run build
-cd ../..
+vp install
+vp run check
+vp run build
 
 # Set your Hex API key
 export HEX_API_KEY=your_api_key_here

@@ -15,21 +15,16 @@ Vite plugin for Phoenix Framework with SSR support and nb_routes auto-regenerati
 ## Installation
 
 ```bash
-npm install @nordbeam/nb-vite --save-dev
+# Install Vite+ once (macOS/Linux), then add the plugin from your Phoenix app.
+curl -fsSL https://vite.plus | bash
+vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
 ```
 
-Or with other package managers:
-
-```bash
-# Yarn
-yarn add @nordbeam/nb-vite --dev
-
-# pnpm
-pnpm add @nordbeam/nb-vite --save-dev
-
-# Bun
-bun add @nordbeam/nb-vite --dev
-```
+The Phoenix installer pins `vite-plus@0.3.0`, aliases `vite` to
+`npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins the matching Vitest runtime.
+Install dependencies with `vp -C assets install`. If Vite+ cannot be installed
+in a constrained environment, the npm CLI remains a supported fallback package
+manager; `@nordbeam/nb-vite` still comes directly from GitHub.
 
 ## Usage
 
@@ -38,44 +33,44 @@ bun add @nordbeam/nb-vite --dev
 Create or update your `vite.config.ts`:
 
 ```typescript
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import phoenix from '@nordbeam/nb-vite';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: ['js/app.ts']
     })
-  ]
+  ])
 });
 ```
 
 ### With React
 
 ```typescript
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import phoenix from '@nordbeam/nb-vite';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     react(),
     phoenix({
       input: ['js/app.tsx'],
       reactRefresh: true
     })
-  ]
+  ])
 });
 ```
 
 ### With SSR Support
 
 ```typescript
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import phoenix from '@nordbeam/nb-vite';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: ['js/app.tsx'],
       ssr: 'js/ssr.tsx',
@@ -84,19 +79,19 @@ export default defineConfig({
         entryPoint: './js/ssr_dev.tsx'
       }
     })
-  ]
+  ])
 });
 ```
 
 ### With nb_routes Auto-regeneration
 
 ```typescript
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import phoenix from '@nordbeam/nb-vite';
 import { nbRoutes } from '@nordbeam/nb-vite/nb-routes';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: ['js/app.ts']
     }),
@@ -104,7 +99,7 @@ export default defineConfig({
       enabled: true,
       verbose: true
     })
-  ]
+  ])
 });
 ```
 
@@ -253,7 +248,7 @@ Supported certificate locations:
 For Docker/container environments, set the `PHOENIX_DOCKER` environment variable:
 
 ```bash
-PHOENIX_DOCKER=1 npm run dev
+PHOENIX_DOCKER=1 vp dev
 ```
 
 This configures the dev server to listen on `0.0.0.0` for container networking.
@@ -264,13 +259,33 @@ The package includes full TypeScript declarations. No additional `@types` packag
 
 ## Compatibility
 
-- **Vite**: 5.0.0, 6.0.0, 7.0.0+
+- **Vite+ workflow**: 0.3.0 (Vite 8.2.2 toolchain)
+- **Vite peer API**: 5.0.0, 6.0.0, 7.0.0, 8.0.0+
 - **Phoenix**: 1.7+
-- **Node.js**: 18.0.0+
+- **Node.js**: 20.19.0+
+- **TypeScript**: 5.9 for the GitHub-distributed plugin build. Vite+'s bundled
+  TypeScript 7 checker is not used for the generated app's authoritative type check.
+
+## Vite+ commands
+
+Run these from the Phoenix `assets/` directory (or prefix with `vp -C assets`):
+
+```bash
+vp install       # Resolve the assets lockfile
+vp dev           # Start Vite with Phoenix HMR
+vp build         # Build production assets
+vp preview       # Preview a production build
+vp check         # Format and lint
+vp run check     # Run vp check plus the TypeScript 5.9 compiler
+```
+
+Use `vp run <script>` when you need to invoke a script from `package.json`.
+For this package's GitHub-distributed library, `vp pack` is the build command and
+copies `src/dev-server-index.html` into `dist/` explicitly.
 
 ## Migration from File Reference
 
-If you're currently using a file reference to nb_vite (e.g., from the Mix package), you can migrate to the npm package:
+If you're currently using a file reference to nb_vite (e.g., from the Mix package), you can migrate to the GitHub package:
 
 **Before:**
 ```typescript
@@ -287,13 +302,13 @@ import phoenix from '@nordbeam/nb-vite';
 ### Complete Phoenix + React + Inertia Setup
 
 ```typescript
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import phoenix from '@nordbeam/nb-vite';
 import { nbRoutes } from '@nordbeam/nb-vite/nb-routes';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     react(),
     phoenix({
       input: ['js/app.tsx'],
@@ -303,18 +318,18 @@ export default defineConfig({
     nbRoutes({
       enabled: true
     })
-  ]
+  ])
 });
 ```
 
 ### With Custom Configuration
 
 ```typescript
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import phoenix from '@nordbeam/nb-vite';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: {
         app: 'js/app.ts',
@@ -328,7 +343,7 @@ export default defineConfig({
       ],
       detectTls: 'myapp.test'
     })
-  ]
+  ])
 });
 ```
 

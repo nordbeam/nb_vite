@@ -1,0 +1,22 @@
+{
+  "name": "nb_vite",
+  "version": "0.3.0",
+  "description": "Version-aware Codex guidance for nb_vite Phoenix Vite+ builds, HMR, TypeScript, SSR, and route regeneration.",
+  "author": { "name": "Nordbeam", "url": "https://github.com/nordbeam" },
+  "homepage": "https://github.com/nordbeam/nb_vite",
+  "repository": "https://github.com/nordbeam/nb_vite",
+  "license": "MIT",
+  "keywords": ["elixir", "phoenix", "vite", "vite-plus", "typescript", "ssr"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "nb_vite",
+    "shortDescription": "Operate Vite+ builds for Phoenix applications",
+    "longDescription": "Install, configure, upgrade, diagnose, and verify nb_vite Vite+ HMR, production builds, TypeScript, SSR, and optional route regeneration.",
+    "developerName": "Nordbeam",
+    "category": "Developer Tools",
+    "capabilities": ["Install", "Configure", "Migrate", "Diagnose", "Verify"],
+    "websiteURL": "https://github.com/nordbeam/nb_vite",
+    "brandColor": "#5E3AAE",
+    "defaultPrompt": ["Use $nb-vite to install or debug a Phoenix Vite+ build."]
+  }
+}

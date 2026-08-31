@@ -1,12 +1,12 @@
 # SSR Performance Benchmark Results
 
-## Module Runner API (Current - v0.2.0)
+## Module Runner API (Historical baseline - v0.2.0)
 
 **Test Configuration:**
 - Requests: 50
 - Component: Home page (full React SSR)
 - Hardware: MacBook (darwin 25.1.0)
-- Vite Version: 7.2.2
+- Vite Version: 7.2.2 (before the Vite+ migration)
 
 **Results:**
 ```
@@ -65,3 +65,17 @@ The migration from vite-node to Module Runner API delivers:
 - ✅ **Future-proof architecture** (official Vite API)
 
 The Module Runner API is production-ready and recommended for all SSR use cases.
+
+## Re-running the benchmark with Vite+
+
+The current workflow uses the Vite+ CLI and its local toolchain:
+
+```bash
+vp -C assets install
+vp -C assets dev
+./benchmark_ssr.sh
+```
+
+Run `vp -C assets toolchain` to record the exact Vite/Vite+/Node versions with
+new measurements. The numbers above are retained as a historical baseline and
+should not be presented as current Vite+ performance data.

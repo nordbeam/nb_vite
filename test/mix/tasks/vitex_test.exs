@@ -4,13 +4,15 @@ defmodule Mix.Tasks.NbViteTest do
   import ExUnit.CaptureIO
 
   alias Mix.Tasks.NbVite
+  alias Mix.Tasks.NbVite.Install
 
   describe "run/1" do
-    test "passes arguments to npm/yarn/bun/pnpm when available" do
+    test "passes arguments to Vite+ when available" do
       # Mock the presence of package manager
       old_path = System.get_env("PATH")
 
-      # Test with npm
+      # Test with Vite+. The executable may not be installed in the test
+      # environment, so the task is expected to raise and be rescued below.
       output =
         capture_io(fn ->
           # We can't actually run npm in tests, but we can test the command formation
@@ -23,8 +25,7 @@ defmodule Mix.Tasks.NbViteTest do
         end)
 
       # The task should attempt to run the command
-      assert output =~ "npm" or output =~ "yarn" or output =~ "bun" or output =~ "pnpm" or
-               output == ""
+      assert output =~ "vp" or output == ""
 
       # Restore PATH
       if old_path, do: System.put_env("PATH", old_path)
@@ -80,31 +81,158 @@ defmodule Mix.Tasks.NbViteTest do
     end
   end
 
-  describe "package manager detection" do
-    test "detects package manager from lock files" do
+  describe "Vite+ assets integration" do
+    test "requires an assets directory" do
       in_tmp(fn ->
-        File.mkdir_p!("assets")
-
-        # Test bun detection
-        File.write!("assets/bun.lockb", "")
-        assert detect_package_manager() == "bun"
-        File.rm!("assets/bun.lockb")
-
-        # Test pnpm detection
-        File.write!("assets/pnpm-lock.yaml", "")
-        assert detect_package_manager() == "pnpm"
-        File.rm!("assets/pnpm-lock.yaml")
-
-        # Test yarn detection
-        File.write!("assets/yarn.lock", "")
-        assert detect_package_manager() == "yarn"
-        File.rm!("assets/yarn.lock")
-
-        # Test npm detection (default)
-        File.write!("assets/package-lock.json", "")
-        assert detect_package_manager() == "npm"
+        assert_raise RuntimeError, ~r/Assets directory not found/, fn ->
+          NbVite.run(["build"])
+        end
       end)
     end
+  end
+
+  describe "Vite+ package manifest" do
+    test "maps local nb_vite Mix dependencies to the GitHub package directory" do
+      source =
+        Install.npm_source_from_dep_declaration(
+          "{:nb_vite, [path: \"../nb_vite\", override: true]}",
+          "github:nordbeam/nb_vite"
+        )
+
+      assert source == "file:#{Path.expand("../nb_vite/priv/nb_vite")}"
+    end
+
+    test "maps GitHub Mix refs to the matching JavaScript dependency" do
+      source =
+        Install.npm_source_from_dep_declaration(
+          "{:nb_vite, [github: \"nordbeam/nb_vite\", ref: \"abc123\"]}",
+          "github:nordbeam/nb_vite"
+        )
+
+      assert source == "github:nordbeam/nb_vite#abc123"
+    end
+
+    test "builds a fresh manifest with the pinned Vite+ toolchain" do
+      manifest = Install.package_json(features(typescript: true), "demo_app")
+
+      assert manifest["name"] == "demo_app"
+      assert manifest["type"] == "module"
+      assert manifest["devDependencies"]["vite-plus"] == "0.3.0"
+      assert manifest["devDependencies"]["vite"] == "npm:@voidzero-dev/vite-plus-core@0.3.0"
+
+      assert manifest["devDependencies"]["@nordbeam/nb-vite"] ==
+               "github:nordbeam/nb_vite"
+
+      assert manifest["devDependencies"]["typescript"] == "^5.9.3"
+      assert manifest["overrides"]["vite"] == "npm:@voidzero-dev/vite-plus-core@0.3.0"
+      assert manifest["overrides"]["vitest"] == "4.1.11"
+      assert manifest["engines"]["node"] == ">=20.19.0"
+      assert manifest["packageManager"] == "npm@12.0.2"
+      assert manifest["devEngines"]["packageManager"]["name"] == "npm"
+      refute Map.has_key?(manifest, "workspaces")
+      assert manifest["dependencies"]["phoenix"] == "^1.8.13"
+      assert manifest["dependencies"]["phoenix_html"] == "^4.3.0"
+      assert manifest["dependencies"]["phoenix_live_view"] == "^1.2.11"
+      assert manifest["scripts"]["dev"] == "vp dev"
+      assert manifest["scripts"]["build"] == "vp build"
+      assert manifest["scripts"]["check"] == "vp check && tsc --noEmit"
+    end
+
+    test "keeps the JavaScript-only check script on Vite+" do
+      manifest = Install.package_json(features(typescript: false), "demo_app")
+
+      assert manifest["scripts"]["check"] == "vp check"
+    end
+
+    test "upgrades an existing manifest without dropping app configuration" do
+      generated = Install.package_json(features(typescript: true), "demo_app")
+
+      existing = %{
+        "name" => "demo_app",
+        "type" => "commonjs",
+        "dependencies" => %{"custom-ui" => "^2.0.0"},
+        "devDependencies" => %{"typescript" => "^5.9.0", "custom-tool" => "^1.0.0"},
+        "scripts" => %{
+          "dev" => "legacy-dev",
+          "build" => "legacy-build",
+          "lint" => "custom-lint"
+        },
+        "overrides" => %{"custom-tool" => "1.0.1"},
+        "packageManager" => "pnpm@11.24.0",
+        "workspaces" => ["packages/*"]
+      }
+
+      migrated = Install.merge_package_json(existing, generated)
+      migrated_again = Install.merge_package_json(migrated, generated)
+
+      assert migrated["type"] == "module"
+      assert migrated["dependencies"]["custom-ui"] == "^2.0.0"
+      assert migrated["devDependencies"]["custom-tool"] == "^1.0.0"
+      assert migrated["scripts"]["lint"] == "custom-lint"
+      assert migrated["scripts"]["dev"] == "vp dev"
+      assert migrated["scripts"]["build"] == "vp build"
+      assert migrated["overrides"]["custom-tool"] == "1.0.1"
+      assert migrated["overrides"]["vitest"] == "4.1.11"
+      assert migrated["packageManager"] == "pnpm@11.24.0"
+
+      assert migrated["workspaces"] == ["packages/*"]
+
+      assert migrated_again == migrated
+    end
+  end
+
+  describe "Vite+ Vite config migration" do
+    test "rewrites a simple existing config and is idempotent" do
+      existing = """
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        plugins: [phoenix({ input: 'js/app.ts' })],
+      });
+      """
+
+      migrated = Install.migrate_vite_config_content(existing, %{typescript: true})
+
+      assert migrated =~ "from 'vite-plus'"
+      assert migrated =~ "import { defineConfig, lazyPlugins } from 'vite-plus'"
+      assert migrated =~ "lazyPlugins(() => [phoenix({ input: 'js/app.ts' })])"
+      refute migrated =~ "typeAware"
+      refute migrated =~ "typeCheck"
+      assert migrated =~ "sortPackageJson: true"
+      refute migrated =~ "from 'vite';"
+      assert Install.migrate_vite_config_content(migrated, %{typescript: true}) == migrated
+    end
+
+    test "leaves complex plugin arrays intact while migrating the import" do
+      existing = """
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        plugins: [react({ include: ['**/*.tsx'] })],
+      });
+      """
+
+      migrated = Install.migrate_vite_config_content(existing, %{typescript: false})
+
+      assert migrated =~ "from 'vite-plus'"
+      assert migrated =~ "plugins: [react({ include: ['**/*.tsx'] })]"
+      assert migrated =~ "fmt: {"
+      refute migrated =~ "lazyPlugins"
+    end
+  end
+
+  defp features(options) do
+    Map.merge(
+      %{
+        react: false,
+        typescript: false,
+        ssr: false,
+        tailwind: false,
+        topbar: false,
+        daisyui: false
+      },
+      Enum.into(options, %{})
+    )
   end
 
   defp in_tmp(fun) do
@@ -115,15 +243,6 @@ defmodule Mix.Tasks.NbViteTest do
       File.cd!(tmp_path, fun)
     after
       File.rm_rf!(tmp_path)
-    end
-  end
-
-  defp detect_package_manager do
-    cond do
-      File.exists?("assets/bun.lockb") -> "bun"
-      File.exists?("assets/pnpm-lock.yaml") -> "pnpm"
-      File.exists?("assets/yarn.lock") -> "yarn"
-      true -> "npm"
     end
   end
 end

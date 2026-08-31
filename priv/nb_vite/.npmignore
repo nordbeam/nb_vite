@@ -15,7 +15,7 @@ example.env
 # Keep source and built files
 !src/
 !dist/
-!rollup.config.js
+!vite.config.ts
 !tsconfig.json
 !README.md
 !LICENSE

@@ -28,17 +28,29 @@ mix igniter.install nb_vite --typescript
 <%= NbVite.vite_assets("css/app.css") %>
 ```
 
-## NPM Package
+## GitHub JavaScript Package
 
-The Vite plugin is available as an npm package for easier dependency management:
+The Vite plugin is installed directly from GitHub. Nordbeam does not publish it
+to the npm registry:
 
 ```bash
-npm install @nordbeam/nb-vite --save-dev
+# Install the Vite+ CLI once (macOS/Linux)
+curl -fsSL https://vite.plus | bash
+
+# From the Phoenix project root, add the plugin to assets/
+vp -C assets add -D @nordbeam/nb-vite@github:nordbeam/nb_vite
 ```
 
-**Benefits of using the npm package:**
-- Standard npm dependency management
-- Automatic updates via package managers
+Vite+ is the supported project workflow. The installer adds
+`vite-plus@0.3.0`, aliases `vite` to
+`npm:@voidzero-dev/vite-plus-core@0.3.0`, and pins Vite+'s Vitest runtime.
+For an existing app, run `vp -C assets install` after migrating its manifest.
+The npm CLI remains a compatible fallback package manager for projects that
+cannot install Vite+; the Nordbeam package source is still GitHub.
+
+**Benefits of using the package:**
+- Standard package dependency management through Vite+
+- Git commit pinning through the generated lockfile
 - Better IDE integration and type checking
 - Smaller Phoenix application footprint
 
@@ -46,19 +58,25 @@ npm install @nordbeam/nb-vite --save-dev
 
 ```typescript
 // assets/vite.config.ts
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import phoenix from '@nordbeam/nb-vite';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: ['js/app.ts']
     })
-  ]
+  ])
 });
 ```
 
-**Legacy file reference:** The plugin is also bundled in `priv/static/nb_vite/` for projects that prefer file references, but the npm package is recommended for new projects.
+Use `vp dev`, `vp build`, `vp preview`, and `vp check` from `assets/` (or
+prefix them with `vp -C assets`). Use `vp run <script>` when you explicitly
+want to invoke a `package.json` script.
+
+**Legacy file reference:** The plugin is also bundled in `priv/static/nb_vite/`
+for projects that prefer file references, but the Vite+ + GitHub dependency
+workflow is recommended for new projects.
 
 ## Vite Plugins
 
@@ -79,12 +97,12 @@ Automatically regenerate route helpers when your Phoenix router changes, with in
 
 ```typescript
 // assets/vite.config.ts
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import phoenix from '@nordbeam/nb-vite';
 import { nbRoutes } from '@nordbeam/nb-vite/nb-routes';
 
 export default defineConfig({
-  plugins: [
+  plugins: lazyPlugins(() => [
     phoenix({
       input: ['js/app.ts'],
     }),
@@ -93,7 +111,7 @@ export default defineConfig({
       verbose: false,      // Enable detailed logging (default: false)
       debounce: 300        // Debounce delay in ms (default: 300)
     })
-  ],
+  ]),
 });
 ```
 
@@ -187,11 +205,21 @@ nbRoutes({
 For SPAs with Inertia.js, use **[nb_inertia](https://github.com/nordbeam/nb_inertia)**:
 
 ```elixir
-{:nb_vite, "~> 0.1"},
-{:nb_inertia, "~> 0.1"}
+{:nb_vite, github: "nordbeam/nb_vite"},
+{:nb_inertia, github: "nordbeam/nb_inertia"}
 ```
 
 See [REFACTORING_NOTES.md](REFACTORING_NOTES.md) for details on the split from Vitex.
+
+## Vite+ compatibility
+
+Generated projects target Vite+ `0.3.0`, Node.js `>=20.19.0`, and the Vite+
+Vite 8 toolchain. The GitHub-distributed plugin keeps its peer range for Vite 5–8 to
+preserve the `@nordbeam/nb-vite` API. The library build stays on TypeScript
+5.9 because the current declaration/plugin stack is not compatible with
+TypeScript 7. Generated TypeScript apps therefore use `vp check` for formatting
+and linting, then TypeScript 5.9 via `vp run check` for the authoritative type
+check.
 
 ## Documentation
 

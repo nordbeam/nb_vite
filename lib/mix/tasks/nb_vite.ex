@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.NbVite do
   @moduledoc """
-  Invokes Vite with the given args.
+  Invokes Vite+ with the given args.
 
   Usage:
 
@@ -26,7 +26,9 @@ defmodule Mix.Tasks.NbVite do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    cmd_args = ["x", "--bun", "vite"] ++ args
+    unless System.find_executable("vp") do
+      Mix.raise("Vite+ (vp) was not found on PATH. Install it from https://vite.plus")
+    end
 
     # Pass through important environment variables
     env = [
@@ -56,8 +58,10 @@ defmodule Mix.Tasks.NbVite do
       |> maybe_add_env("RENDER")
       |> maybe_add_env("RAILWAY_ENVIRONMENT")
 
-    # Use mix bun assets to leverage the cd configuration
-    Mix.shell().cmd("mix bun assets #{Enum.join(cmd_args, " ")}", env: env)
+    # Vite+ owns the Node.js runtime and package-manager integration. Run it
+    # from the assets directory so its local vite-plus package and config are
+    # resolved exactly as they are for `vp dev`/`vp build`.
+    Mix.shell().cmd({"vp", args}, cd: assets_dir, env: env)
   end
 
   defp node_env do
@@ -91,7 +95,7 @@ end
 
 defmodule Mix.Tasks.NbVite.Build do
   @moduledoc """
-  Builds assets via Vite.
+  Builds assets via Vite+.
 
   Usage:
 
@@ -112,16 +116,16 @@ end
 
 defmodule Mix.Tasks.NbVite.Deps do
   @moduledoc """
-  Installs JavaScript dependencies using the Bun binary from the bun Mix package.
+  Installs JavaScript dependencies using Vite+.
 
   Usage:
 
       $ mix nb_vite.deps
 
-  This task uses the Bun binary downloaded by the bun Mix package.
-  Make sure to run `mix bun.install` first if you haven't already.
+  Vite+ detects the package manager from the assets lockfile and invokes the
+  local `vite-plus` toolchain.
   """
-  @shortdoc "Installs JavaScript dependencies using Bun"
+  @shortdoc "Installs JavaScript dependencies using Vite+"
 
   use Mix.Task
 
@@ -133,7 +137,10 @@ defmodule Mix.Tasks.NbVite.Deps do
       raise "Assets directory not found at #{assets_dir}"
     end
 
-    # Use mix bun assets to leverage the cd configuration
-    Mix.Task.run("bun", ["assets", "install"])
+    unless System.find_executable("vp") do
+      Mix.raise("Vite+ (vp) was not found on PATH. Install it from https://vite.plus")
+    end
+
+    Mix.shell().cmd({"vp", ["install"]}, cd: assets_dir)
   end
 end

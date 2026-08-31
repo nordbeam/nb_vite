@@ -87,16 +87,16 @@ const PAGES_ALIAS = '@pages/';
  *
  * @example
  * ```typescript
- * import { defineConfig } from 'vite';
+ * import { defineConfig, lazyPlugins } from 'vite-plus';
  * import { nbInertia } from '@nordbeam/nb-vite/nb-inertia';
  *
  * export default defineConfig({
- *   plugins: [
+ *   plugins: lazyPlugins(() => [
  *     nbInertia({
  *       enabled: true,
  *       verbose: true
  *     })
- *   ]
+ *   ])
  * });
  * ```
  */
@@ -105,10 +105,7 @@ export function nbInertia(options: NbInertiaPluginOptions = {}): Plugin {
     enabled: true,
     pagesDir: '../.nb_inertia/pages',
     standaloneDir: 'pages',
-    watchPaths: [
-      '../lib/**/*_page/**/*.ex',
-      '../lib/**/*_page.ex',
-    ],
+    watchPaths: ['../lib/**/*_page/**/*.ex', '../lib/**/*_page.ex'],
     debounce: 100,
     extractCmd: 'mix nb_inertia.extract',
     extensions: ['.tsx', '.jsx', '.vue'],
@@ -121,7 +118,6 @@ export function nbInertia(options: NbInertiaPluginOptions = {}): Plugin {
   }
 
   let server: ViteDevServer | null = null;
-  let config: ResolvedConfig | null = null;
   let isExtracting = false;
   let debounceTimer: NodeJS.Timeout | null = null;
   let resolvedPagesDir: string = '';
@@ -314,10 +310,7 @@ export function nbInertia(options: NbInertiaPluginOptions = {}): Plugin {
     const patterns = opts.watchPaths;
     return patterns.some((pattern) => {
       // Simple glob matching — supports ** and *
-      const regex = pattern
-        .replace(/\./g, '\\.')
-        .replace(/\*\*/g, '.*')
-        .replace(/\*/g, '[^/]*');
+      const regex = pattern.replace(/\./g, '\\.').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
       return new RegExp(`^${regex}$`).test(filePath);
     });
   }
@@ -326,8 +319,6 @@ export function nbInertia(options: NbInertiaPluginOptions = {}): Plugin {
     name: PLUGIN_NAME,
 
     configResolved(resolvedConfig: ResolvedConfig) {
-      config = resolvedConfig;
-
       // Resolve directories relative to Vite root
       const root = resolvedConfig.root;
       resolvedPagesDir = path.isAbsolute(opts.pagesDir)

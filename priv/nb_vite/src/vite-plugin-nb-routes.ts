@@ -7,7 +7,6 @@
 
 import type { Plugin, ViteDevServer } from 'vite';
 import { spawn, type ChildProcess } from 'child_process';
-import * as fs from 'fs';
 import * as path from 'path';
 
 export interface NbRoutesPluginOptions {
@@ -59,16 +58,16 @@ export interface NbRoutesPluginOptions {
  *
  * @example
  * ```typescript
- * import { defineConfig } from 'vite';
+ * import { defineConfig, lazyPlugins } from 'vite-plus';
  * import { nbRoutes } from '@nordbeam/nb-vite/nb-routes';
  *
  * export default defineConfig({
- *   plugins: [
+ *   plugins: lazyPlugins(() => [
  *     nbRoutes({
  *       enabled: true,
  *       verbose: true
  *     })
- *   ]
+ *   ])
  * });
  * ```
  */
@@ -80,7 +79,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
     verbose: false,
     routesFile: 'assets/js/routes.js',
     command: 'mix nb_routes.gen',
-    ...options
+    ...options,
   };
 
   let server: ViteDevServer | null = null;
@@ -108,7 +107,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
     const spawnOptions: import('child_process').SpawnOptions = {
       stdio: 'inherit',
       cwd: opts.cwd || process.cwd(),
-      shell: process.platform === 'win32' // Only use shell on Windows for .bat/.cmd files
+      shell: process.platform === 'win32', // Only use shell on Windows for .bat/.cmd files
     };
 
     const child: ChildProcess = spawn(cmd, args, spawnOptions);
@@ -159,7 +158,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
       `/${routesFile}`,
       `/${routesFile.replace(/^assets\//, '')}`,
       path.resolve(routesFile),
-      path.resolve('assets', path.basename(routesFile))
+      path.resolve('assets', path.basename(routesFile)),
     ];
 
     for (const modulePath of possiblePaths) {
@@ -171,7 +170,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
         server.moduleGraph.invalidateModule(module);
         server.ws.send({
           type: 'full-reload',
-          path: '*'
+          path: '*',
         });
         return;
       }
@@ -184,7 +183,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
     // If module not found, trigger a full reload anyway
     server.ws.send({
       type: 'full-reload',
-      path: '*'
+      path: '*',
     });
   }
 
@@ -194,12 +193,9 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
   function matchesRouterPattern(filePath: string): boolean {
     const patterns = Array.isArray(opts.routerPath) ? opts.routerPath : [opts.routerPath];
 
-    return patterns.some(pattern => {
+    return patterns.some((pattern) => {
       // Simple glob matching - supports ** and *
-      const regex = pattern
-        .replace(/\./g, '\\.')
-        .replace(/\*\*/g, '.*')
-        .replace(/\*/g, '[^/]*');
+      const regex = pattern.replace(/\./g, '\\.').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
 
       return new RegExp(`^${regex}$`).test(filePath);
     });
@@ -251,7 +247,7 @@ export function nbRoutes(options: NbRoutesPluginOptions = {}): Plugin {
       }
 
       regenerateRoutes();
-    }
+    },
   };
 }
 

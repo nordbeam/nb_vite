@@ -1,9 +1,9 @@
 defmodule Mix.Tasks.NbVite.Ssr.Build do
   @moduledoc """
-  Builds Server-Side Rendering (SSR) assets via Vite.
+  Builds Server-Side Rendering (SSR) assets via Vite+.
 
   This task is a convenience wrapper for building SSR assets.
-  It runs `vite build --ssr` with the appropriate environment.
+  It runs `vp build --ssr` with the appropriate environment.
 
   ## Usage
 
@@ -22,7 +22,7 @@ defmodule Mix.Tasks.NbVite.Ssr.Build do
         // ... other options
       })
   """
-  @shortdoc "Builds SSR assets via Vite"
+  @shortdoc "Builds SSR assets via Vite+"
 
   use Mix.Task
 

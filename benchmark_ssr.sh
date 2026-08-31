@@ -1,5 +1,5 @@
 #!/bin/bash
-# SSR Performance Benchmark: vite-node vs Module Runner API
+# SSR Performance Benchmark: Module Runner API through Vite+
 
 set -e
 
@@ -123,10 +123,10 @@ main() {
     echo "  Endpoint: $SSR_URL"
     echo ""
 
-    # Check if vite is running
+    # Check if the Vite+ dev server is running
     if ! curl -s "$HEALTH_URL" > /dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  Vite dev server is not running${NC}"
-        echo "Please start it with: cd assets && npm run dev"
+        echo -e "${YELLOW}⚠️  Vite+ dev server is not running${NC}"
+        echo "Please start it with: vp -C assets dev"
         exit 1
     fi
 
@@ -142,11 +142,11 @@ main() {
     echo ""
     echo "✅ Benchmark complete!"
     echo ""
-    echo "To benchmark the old vite-node implementation:"
+    echo "To compare with the old vite-node implementation:"
     echo "  1. cd /Users/assim/Projects/nb/nb_vite"
     echo "  2. git checkout de52a22  # Previous commit before Module Runner"
-    echo "  3. npm install"
-    echo "  4. npm run build"
+    echo "  3. vp -C assets install"
+    echo "  4. vp -C assets build"
     echo "  5. Restart vite dev server"
     echo "  6. Run this benchmark again"
 }
