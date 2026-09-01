@@ -33,6 +33,12 @@ npm 12 can fetch the declared first-party package and registry packages such as
 Tailwind that resolve platform artifacts through remote tarballs.
 `@nordbeam/nb-vite` still comes directly from GitHub.
 
+Vitest resolves Vite configurations with `command: 'serve'` but `mode: 'test'`.
+NbVite treats that as a test-only config pass: Phoenix HMR/SSR endpoint setup,
+hot-file writes, development warnings, process handlers, and stdin ownership are
+skipped so `vp test` can exit cleanly. Run a separate development-mode Vite
+process for integration tests that need the Phoenix server.
+
 ## Usage
 
 ### Basic Setup

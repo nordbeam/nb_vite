@@ -36,5 +36,10 @@ Phoenix 1.8 colocated hooks, SSR, or the optional `nb_routes` watcher.
   and changelog before migrating an existing app.
 - For missing assets or HMR, check the Vite root/input, watcher, `priv/hot`,
   manifest path, host/port/TLS, and browser console.
+- Vitest uses Vite's `serve` command with `mode: 'test'`; NbVite deliberately
+  skips Phoenix dev-server side effects in that mode, including SSR Module
+  Runner setup, hot files, PHX_HOST warnings, process handlers, and watchers.
+  Run a separate development-mode server for integration tests that need the
+  Phoenix endpoint.
 - Run `mix deps.get`, `mix compile`, `mix test`, `vp check`, `vp test`, and
   `vp build` (or `vp pack` for the library). Exercise SSR only when enabled.

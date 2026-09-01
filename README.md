@@ -97,6 +97,13 @@ legacy Phoenix workspaces `../deps/phoenix`, `../deps/phoenix_html`, and
 `../deps/phoenix_live_view`. Any custom workspace entries and workspace
 configuration are preserved.
 
+Vitest resolves Vite configurations with `command: 'serve'` but `mode: 'test'`.
+NbVite treats that as a test-only config pass: Phoenix HMR/SSR endpoint setup,
+hot-file writes, development warnings, signal handlers, and stdin ownership are
+skipped so `vp test` can exit cleanly. To exercise the real Phoenix dev server
+from an integration test, run a separate Vite process in a development mode and
+set the appropriate Phoenix integration environment explicitly.
+
 **Benefits of using the package:**
 - Standard package dependency management through Vite+
 - Git commit pinning through the generated lockfile

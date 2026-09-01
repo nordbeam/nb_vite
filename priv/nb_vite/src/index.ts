@@ -602,15 +602,20 @@ function resolvePhoenixPlugin(pluginConfig: Required<PluginConfig>): PhoenixPlug
       const localDependencySupport = resolveLocalPathDependencySupport(rootDirectory);
       const assetUrl = environment.ASSET_URL ?? 'assets';
       const serverConfig =
-        env.command === 'serve'
+        env.command === 'serve' && !isViteTestMode(env.mode)
           ? (resolveDevelopmentEnvironmentServerConfig(pluginConfig.detectTls, environment) ??
             resolveEnvironmentServerConfig(environment))
           : undefined;
 
-      ensureCommandShouldRunInEnvironment(env.command, environment);
+      // Vitest asks Vite to resolve a `serve` configuration in `test` mode.
+      // That is a config-only pass, not a Phoenix HMR server, so do not apply
+      // the development-only environment checks or warnings to it.
+      if (!isViteTestMode(env.mode)) {
+        ensureCommandShouldRunInEnvironment(env.command, environment);
+      }
 
       // Warn about common configuration issues
-      if (env.command === 'serve') {
+      if (env.command === 'serve' && !isViteTestMode(env.mode)) {
         checkCommonConfigurationIssues(pluginConfig, environment, userConfig);
       }
 
@@ -741,6 +746,16 @@ function resolvePhoenixPlugin(pluginConfig: Required<PluginConfig>): PhoenixPlug
       return code;
     },
     async configureServer(server) {
+      // Vitest uses Vite's `serve` command while it resolves the test graph.
+      // Do not start Phoenix-only services here: SSR Module Runner setup,
+      // middleware/watchers, hot files, process signal handlers, and stdin
+      // ownership all belong to an interactive Phoenix dev server. Leaving
+      // them active in Vitest makes tests print PHX_HOST warnings and keeps
+      // the process alive while the test runner is trying to close it.
+      if (isViteTestMode(server.config.mode)) {
+        return;
+      }
+
       const envDir = server.config.envDir || process.cwd();
       const phxHost = loadEnv(server.config.mode, envDir, 'PHX_HOST').PHX_HOST ?? 'localhost:4000';
 
@@ -1142,6 +1157,16 @@ function checkCommonConfigurationIssues(
         `TLS is typically only needed in development. Consider disabling it for other environments.\n`,
     );
   }
+}
+
+/**
+ * Return whether Vite is being driven by Vitest rather than a Phoenix dev
+ * server. Vitest normally sets `mode` to `test`; the environment checks make
+ * this robust for projects that override the mode while retaining Vitest's
+ * process marker.
+ */
+function isViteTestMode(mode?: string): boolean {
+  return mode === 'test' || typeof process.env.VITEST !== 'undefined';
 }
 
 /**

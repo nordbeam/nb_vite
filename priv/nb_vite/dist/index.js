@@ -2212,9 +2212,9 @@ function resolvePhoenixPlugin(pluginConfig) {
 			const environment = loadEnv(env.mode, userConfig.envDir || process.cwd(), "");
 			const localDependencySupport = resolveLocalPathDependencySupport(rootDirectory);
 			const assetUrl = environment.ASSET_URL ?? "assets";
-			const serverConfig = env.command === "serve" ? resolveDevelopmentEnvironmentServerConfig(pluginConfig.detectTls, environment) ?? resolveEnvironmentServerConfig(environment) : void 0;
-			ensureCommandShouldRunInEnvironment(env.command, environment);
-			if (env.command === "serve") checkCommonConfigurationIssues(pluginConfig, environment, userConfig);
+			const serverConfig = env.command === "serve" && !isViteTestMode(env.mode) ? resolveDevelopmentEnvironmentServerConfig(pluginConfig.detectTls, environment) ?? resolveEnvironmentServerConfig(environment) : void 0;
+			if (!isViteTestMode(env.mode)) ensureCommandShouldRunInEnvironment(env.command, environment);
+			if (env.command === "serve" && !isViteTestMode(env.mode)) checkCommonConfigurationIssues(pluginConfig, environment, userConfig);
 			return {
 				base: userConfig.base ?? (env.command === "build" ? resolveBase(pluginConfig, assetUrl) : ""),
 				publicDir: userConfig.publicDir ?? false,
@@ -2297,6 +2297,7 @@ function resolvePhoenixPlugin(pluginConfig) {
 			return code;
 		},
 		async configureServer(server) {
+			if (isViteTestMode(server.config.mode)) return;
 			const envDir = server.config.envDir || process.cwd();
 			const phxHost = loadEnv(server.config.mode, envDir, "PHX_HOST").PHX_HOST ?? "localhost:4000";
 			if (typeof pluginConfig.ssrDev === "object" && pluginConfig.ssrDev.enabled) await setupSSREndpoint(server, pluginConfig.ssrDev);
@@ -2453,6 +2454,15 @@ function checkCommonConfigurationIssues(pluginConfig, env, userConfig) {
 [nb-vite] ${import_picocolors.default.yellow("Warning")}: reactRefresh is enabled but @vitejs/plugin-react is not detected.\nInstall and configure @vitejs/plugin-react for React refresh to work properly.\n`);
 	if (env.MIX_ENV && env.MIX_ENV !== "dev" && (pluginConfig.detectTls || env.VITE_DEV_SERVER_KEY)) console.warn(`
 [nb-vite] ${import_picocolors.default.yellow("Warning")}: TLS/SSL is configured but MIX_ENV is set to "${env.MIX_ENV}".\nTLS is typically only needed in development. Consider disabling it for other environments.\n`);
+}
+/**
+* Return whether Vite is being driven by Vitest rather than a Phoenix dev
+* server. Vitest normally sets `mode` to `test`; the environment checks make
+* this robust for projects that override the mode while retaining Vitest's
+* process marker.
+*/
+function isViteTestMode(mode) {
+	return mode === "test" || typeof process.env.VITEST !== "undefined";
 }
 /**
 * Validate the command can run in the given environment.
